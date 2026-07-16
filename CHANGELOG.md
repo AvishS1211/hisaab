@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **Supabase persistence + realtime** — the log now lives in Supabase. The book loads it on open, appends every write (expense, settlement, strike, new person, new hisaab), and merges realtime inserts so flatmates sync live. Append-only is DB-enforced by RLS (no update/delete on `entries`). Falls back to the in-memory seed when no project is configured. Verified live: people, hisaabs, members, and entries all persist across a reload.
 - **Identity ("Who are you?")** — first open shows a name chooser; tap your name (or write it) and the device remembers you in `localStorage` (`device_id` → `person_id`). No signup. The whole app then runs from your perspective — "you owe" / "owes you" flip per person — and a "switch" control on Accounts lets you change who you are. The seed's placeholder "You" is now a real name (Avish).
 - **The book + page-turn navigation** — home is now a book of pages: Accounts (profile) → Hisaabs (groups) → a ledger. Swipe right-to-left to go deeper, left-to-right to come back, each with a page-turn animation (rotate around the left spine, blank paper on the back). The book owns all state, so writes/strikes/settlements/new groups persist as you move between pages.
 - **Groups page + add a hisaab** — lists every hisaab with your standing in it, and a composer to create one: name it, pick rolling/trip, choose the cast (and add brand-new people inline). Deity auto-alternates. Creating a hisaab turns you straight into it.

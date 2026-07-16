@@ -4,7 +4,7 @@ Current architecture snapshot. Describes the present, not the plan — see CLAUD
 
 ## Where things stand
 
-Steps 1–4 of the build order are done, plus the settle/strike gestures, group creation, page-turn navigation, and identity (the "identity" half of step 5). Home is a "book" that turns between the profile, the groups list, and a ledger, all from the signed-in person's perspective. Persistence (Supabase) is not wired yet, so nothing survives a reload.
+Steps 1–5 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, identity, and Supabase persistence with realtime sync. The book loads the log from Supabase, appends to it, and merges live inserts; it falls back to the in-memory seed when no project is configured. Remaining: share links + OG image (step 6), PWA/offline (step 7), sessions (step 8).
 
 ## Layout
 
@@ -18,7 +18,11 @@ src/lib/deity.ts     Deity → the Devanagari line inked at the top of the page.
 src/lib/parseLine.ts Likhna parsing: "Petrol 2400" → { label, amount }. 6 tests.
 src/lib/personView.ts  Builds the person page from the log: net + reconciling working. 6 tests.
 src/lib/identity.ts  device_id + chosen person_id in localStorage. No accounts.
+src/lib/supabase.ts  The browser client (null when env vars are absent).
+src/lib/db.ts        Append-only data layer: fetchAll, insert*, realtime subscribe.
 src/components/WhoAreYou.tsx  The name chooser shown until this device is signed in.
+db/supabase-setup.sql  One-time SQL to run in the project (schema + RLS + realtime).
+.env.example         The two NEXT_PUBLIC vars; copy to .env.local (gitignored).
 src/lib/seed.ts      Hardcoded seed: two hisaabs (Goa, Ghar), a settlement, an old account.
 src/components/Book.tsx  The book: owns all state, turns between the three pages.
 src/components/PersonPage.tsx  Page 1 — Accounts: nets, working, settle gesture.
@@ -104,6 +108,25 @@ page is in normal flow so long ledgers scroll.
 
 Because the book holds the log, writes, strikes, settlements, and new groups
 persist across page turns (still client-state only until Supabase).
+
+## Persistence (Supabase)
+
+When `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set,
+`src/lib/supabase.ts` makes a client and the book runs off the database:
+
+- On mount it `fetchAll()`s the four tables into state and opens a realtime
+  channel; children write through actions (`addEntries`/`addPerson`/`addHisaab`)
+  that update state optimistically and insert to Supabase. Realtime inserts are
+  merged by id (a locally-inserted row echoes back and must not double up).
+- **Append-only is enforced in the database.** RLS grants select + insert on
+  every table but no update/delete on `entries` — corrections stay strikes, by
+  the DB, not just by convention. Only `hisaabs.status` and
+  `hisaab_members.on_roster` are updatable. See `db/supabase-setup.sql`.
+- **No auth** (§9's "RLS scoped by membership" is relaxed for v1): identity is a
+  tapped name, so anyone with the anon key can read/append — it's a trust
+  object. The anon/publishable key is safe in the client; RLS is the gate.
+- With no project configured, `supabase` is null, every db function no-ops, and
+  the app runs on the in-memory seed exactly as before.
 
 ## Identity
 

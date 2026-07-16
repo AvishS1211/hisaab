@@ -129,7 +129,7 @@ export function HisaabPage({
         <span className="payer">{initial(nameOf(currentPersonId))}</span>
         <input
           ref={inputRef}
-          className="open-input"
+          className="open-input" autoComplete="off" data-1p-ignore data-lpignore="true"
           value={draft}
           autoFocus
           spellCheck={false}

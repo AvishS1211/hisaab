@@ -124,7 +124,7 @@ export function PersonPage({
               {youPay ? `you pay ${s.person.name}` : `${s.person.name} pays you`}
             </span>
             <input
-              className="open-input settle-input"
+              className="open-input settle-input" autoComplete="off" data-1p-ignore data-lpignore="true"
               value={draft}
               inputMode="numeric"
               autoFocus

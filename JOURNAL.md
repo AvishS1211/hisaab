@@ -156,3 +156,17 @@ Dev paid 1200            you owe Dev
 **One trap for the record:** the strike-hover preview was written against `button.entry`, and the groups page reuses `.entry` rows as buttons — so hovering "Goa" previewed striking it. Scoped the preview to `button.entry.expense`. When a class stops meaning one thing, specificity bugs follow.
 
 **Lesson:** when a UI gesture keeps insisting (swipe = turn a page), check whether it's actually the data model asking for a different owner. Here the "animation request" was really "the book should hold the ledger" — and both problems solved each other.
+
+---
+
+## 2026-07-16 — Step 5: persistence was cheap because the log was append-only
+
+**Context:** Wired the log to Supabase. The whole storage layer is `fetchAll` + four `insert`s + a realtime subscription — no update paths, no conflict resolution, no migrations of derived state. This is the append-only bet from day one paying out: writes are inserts, balances are recomputed on read, so "sync" is just "append the same rows everywhere."
+
+**The one real decision — RLS with no auth.** §9 says "RLS scoped by hisaab membership," but §2 says no accounts — identity is a name you tap, stored on the device. Those can't both be fully true without auth. Rather than bolt on Supabase Auth (which the metaphor rejects — the shopkeeper doesn't check ID), the v1 posture is: anyone with the anon key can read and *append*, and RLS enforces the thing that actually matters — the ledger is append-only. `entries` gets select + insert policies and deliberately *no* update/delete, so "you cannot un-write ink" is guaranteed by Postgres, not by our client code. The knowledge that someone could tap the wrong name is the same risk as someone grabbing the physical notebook — acceptable for a trust object. If real per-group privacy is ever needed, that's when auth (or signed join tokens) comes in.
+
+**Verified live**, not just typechecked: signed in by writing a name → reloaded → the name came back from the DB; created a hisaab, wrote a line → reloaded → both there. React state resets on reload, so anything that survives came from Postgres.
+
+**Small footgun caught:** the automated browser kept autofilling the name field ("Lalla" instead of what was typed). Browsers treat a field labelled "name" as a contact field. Added `autocomplete="off"` to every ledger input — a khata should never offer to autofill.
+
+**Lesson:** an architecture decision made for one reason (append-only, so corrections are honest) keeps paying rent in places you didn't plan for. Offline sync, realtime, and "no migrations ever" all fell out of it for free. Worth remembering when the cheap-but-mutable option tempts early.

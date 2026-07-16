@@ -126,7 +126,7 @@ export function GroupsPage({
       {/* Name it. */}
       <div className="entry open-line">
         <input
-          className="open-input"
+          className="open-input" autoComplete="off" data-1p-ignore data-lpignore="true"
           value={name}
           spellCheck={false}
           placeholder="Name a hisaab"
@@ -170,7 +170,7 @@ export function GroupsPage({
       </div>
       <div className="entry open-line add-person-row">
         <input
-          className="open-input"
+          className="open-input" autoComplete="off" data-1p-ignore data-lpignore="true"
           value={newName}
           spellCheck={false}
           placeholder="add a name"

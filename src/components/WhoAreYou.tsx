@@ -47,7 +47,7 @@ export function WhoAreYou({
       <div className="spacer-1" />
       <div className="entry open-line">
         <input
-          className="open-input"
+          className="open-input" autoComplete="off" data-1p-ignore data-lpignore="true"
           value={name}
           spellCheck={false}
           placeholder="or write your name"
