@@ -1,0 +1,403 @@
+/* ── Kalam (self-hosted, from Google Fonts) ─────────────────────────────────
+   Ledger content only. Chrome and metadata are system sans. */
+
+/* devanagari */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 300; font-display: swap; src: url(/fonts/kalam-3.woff2) format('woff2'); unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09; }
+/* latin-ext */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 300; font-display: swap; src: url(/fonts/kalam-1.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+/* latin */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 300; font-display: swap; src: url(/fonts/kalam-2.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* devanagari */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/kalam-7.woff2) format('woff2'); unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09; }
+/* latin-ext */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/kalam-9.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+/* latin */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/kalam-8.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+/* devanagari */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/kalam-6.woff2) format('woff2'); unicode-range: U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B09; }
+/* latin-ext */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/kalam-4.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+/* latin */
+@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/kalam-5.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* ── Tokens ──────────────────────────────────────────────────────────────── */
+:root {
+  --paper: #f7f1e3;
+  --rule: #b4c6d8;          /* faint blue ruled line */
+  --margin-red: #d38b83;    /* vertical margin line */
+  --ink: #2a3348;           /* blue-black ledger ink */
+  --ink-faded: #b0a892;     /* struck / settled, greyed */
+  --meta: #918876;          /* system-sans metadata */
+
+  --line: 28px;             /* the rhythm. everything is a multiple of this. */
+  --margin-x: 34px;         /* red vertical line, from the left */
+  --content-x: 56px;        /* where writing begins (clears the margin) */
+  --content-r: 28px;        /* right padding */
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --hand: "Kalam", "Segoe UI", var(--sans);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #efe7d4;      /* desk behind the sheet */
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Mobile-first: the app is a phone-width object. On a wider screen it stays a
+   phone-width column centered on the desk — never a desktop layout. */
+:root { --sheet-w: 430px; }
+
+body {
+  display: flex;
+  justify-content: center;
+}
+
+/* The sheet of ruled paper. The ruled lines and the red margin ARE the
+   background — get the 28px rhythm right and it reads as paper. */
+.sheet {
+  position: relative;
+  width: 100%;
+  max-width: var(--sheet-w);
+  min-height: 100vh;
+  margin: 0 auto;
+  background-color: var(--paper);
+  background-image:
+    /* red vertical margin at --margin-x */
+    linear-gradient(
+      to right,
+      transparent var(--margin-x),
+      var(--margin-red) var(--margin-x),
+      var(--margin-red) calc(var(--margin-x) + 1px),
+      transparent calc(var(--margin-x) + 1px)
+    ),
+    /* blue horizontal rule at the bottom of every 28px band */
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--line) - 1px),
+      var(--rule) calc(var(--line) - 1px),
+      var(--rule) var(--line)
+    );
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(60, 50, 30, 0.12);
+}
+
+/* Every block is a whole number of lines so writing always lands on a rule. */
+.row {
+  height: var(--line);
+  padding: 0 var(--content-r) 0 var(--content-x);
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.spacer-1 { height: var(--line); }
+.spacer-2 { height: calc(var(--line) * 2); }
+
+/* Deity — text, not an icon. Two lines tall, centered, in the hand. */
+.deity {
+  height: calc(var(--line) * 2);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 var(--content-r);
+  font-family: var(--hand);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: calc(var(--line) * 2);
+  color: #6a5636;
+  letter-spacing: 0.5px;
+}
+
+/* Hisaab title block — system sans metadata (chrome, not ledger). */
+.title-row {
+  height: var(--line);
+  padding: 0 var(--content-r) 0 var(--content-x);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.title {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+.title .kind { font-weight: 400; opacity: 0.8; }
+
+/* Cast strip — who lines default to. Read-only in step 2. */
+.cast-row {
+  height: var(--line);
+  padding: 0 var(--content-r) 0 var(--content-x);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.cast-name {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--meta);
+  padding: 1px 8px;
+  border: 1px solid rgba(145, 136, 118, 0.35);
+  border-radius: 999px;
+  line-height: 16px;
+  margin-bottom: 4px;
+}
+
+/* An expense line. Text baseline rests just above the rule. */
+.entry {
+  position: relative;
+  height: var(--line);
+  padding: 0 var(--content-r) 0 var(--content-x);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--hand);
+  font-size: 19px;
+  line-height: var(--line);
+  color: var(--ink);
+}
+.entry .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry .amount { font-variant-numeric: tabular-nums; padding-left: 12px; }
+
+/* Payer initial, written in the margin gutter like a marginal note. */
+.entry .payer {
+  position: absolute;
+  left: 0;
+  width: var(--margin-x);
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--meta);
+  bottom: 5px;
+}
+
+/* An expense line is a button — tap to strike it, tap again to undo. */
+button.entry {
+  width: 100%;
+  border: none;
+  background: transparent;
+  /* Keep the ledger hand — .entry's font/color (a class) beats the UA button
+     styles (an element), so don't reset them here. */
+  text-align: left;
+  letter-spacing: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button.entry:focus-visible { outline: 2px solid var(--margin-red); outline-offset: -2px; }
+/* Hover previews the strike you're about to draw (expense lines only). */
+button.entry.expense:not(.struck):hover .label,
+button.entry.expense:not(.struck):hover .amount {
+  text-decoration: line-through;
+  text-decoration-color: rgba(211, 139, 131, 0.5);
+}
+button.entry.expense.struck:hover { color: #97907e; }
+
+/* Struck, never gone: greyed, with a strike through the whole line. */
+.entry.struck { color: var(--ink-faded); }
+.entry.struck .payer { color: var(--ink-faded); }
+.entry.struck .label,
+.entry.struck .amount { text-decoration: line-through; text-decoration-color: rgba(211, 139, 131, 0.9); }
+
+/* The open line — the always-live input. No box, no button: you write on the
+   page. The caret sits on the rule like every other line. */
+.open-line { align-items: baseline; }
+.open-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-family: var(--hand);
+  font-size: 19px;
+  line-height: var(--line);
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+.open-input:focus { outline: none; }
+.open-input::placeholder { color: rgba(145, 136, 118, 0.5); }
+
+/* ── The book: page-turn navigation ─────────────────────────────────────────
+   Not animating, the page is in normal flow so long ledgers scroll. During a
+   turn the two pages go absolute and one rotates around the left spine. */
+.book {
+  position: relative;
+  width: 100%;
+  max-width: var(--sheet-w);
+  margin: 0 auto;
+}
+.book.animating {
+  height: 100vh;
+  overflow: hidden;
+  perspective: 2000px;
+}
+.book.animating .page {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.turning {
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  will-change: transform;
+  z-index: 2;
+}
+.turn-out { animation: turnOut 0.7s cubic-bezier(0.36, 0.1, 0.28, 1) forwards; }
+.turn-in { animation: turnIn 0.7s cubic-bezier(0.36, 0.1, 0.28, 1) forwards; }
+@keyframes turnOut { from { transform: rotateY(0); } to { transform: rotateY(-179deg); } }
+@keyframes turnIn { from { transform: rotateY(-179deg); } to { transform: rotateY(0); } }
+
+.face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+/* The reverse of a turning page reads as blank paper. */
+.face.back { transform: rotateY(180deg); background-color: var(--paper); }
+/* A soft shadow near the spine gives the turn some depth. */
+.face.front::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to left, rgba(60, 50, 30, 0.16), transparent 32%);
+}
+
+.swipe-hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--meta);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-out, .turn-in { animation-duration: 0.01s; }
+}
+
+/* ── Groups page ─────────────────────────────────────────────────────────── */
+.group-kind { font-family: var(--sans); font-size: 12px; color: var(--meta); text-transform: lowercase; }
+.group-standing { font-family: var(--sans); font-size: 12px; color: var(--meta); white-space: nowrap; }
+.cast-wrap { overflow-x: auto; scrollbar-width: none; }
+.cast-wrap::-webkit-scrollbar { display: none; }
+.add-person-row .open-input { font-size: 15px; }
+.empty-note { font-family: var(--sans); font-size: 13px; color: var(--meta); }
+
+/* ── Person page ─────────────────────────────────────────────────────────── */
+
+/* Lead line: the name and the one net number. Show the number, then the working. */
+.person {
+  height: var(--line);
+  padding: 0 var(--content-r) 0 var(--content-x);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--hand);
+  font-size: 19px;
+  line-height: var(--line);
+  color: var(--ink);
+}
+.person .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.net, .break-amt { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+.net .amt, .break-amt .amt { font-variant-numeric: tabular-nums; }
+.dir { font-family: var(--sans); font-size: 12px; color: var(--meta); }
+
+/* The net number is the settle button — tap it to write the payment (Chukta). */
+button.net {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+}
+button.net .amt { transition: text-decoration-color 0.12s ease; text-decoration: underline dotted transparent; text-underline-offset: 4px; }
+button.net:hover .amt { text-decoration-color: var(--margin-red); }
+button.net:focus-visible { outline: 2px solid var(--margin-red); outline-offset: 2px; }
+
+/* The settle line: write the payment on the rule. */
+.settle-row { justify-content: space-between; }
+.settle-verb {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--meta);
+  white-space: nowrap;
+  align-self: flex-end;
+  margin-bottom: 4px;
+}
+.settle-input { flex: 0 0 auto; width: 40%; text-align: right; }
+
+/* The working: per-group and settlement lines, indented under the person. */
+.break {
+  height: var(--line);
+  padding: 0 var(--content-r) 0 calc(var(--content-x) + 20px);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--hand);
+  font-size: 15px;
+  line-height: var(--line);
+  color: #6f6857;
+  text-decoration: none;
+}
+.break .label { white-space: nowrap; }
+button.break { width: 100%; border: none; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a.break .label, button.break .label { border-bottom: 1px dotted rgba(111, 104, 87, 0.5); }
+a.break:hover .label, button.break:hover .label { border-bottom-color: currentColor; }
+a.break:focus-visible, button.break:focus-visible { outline: 2px solid var(--margin-red); outline-offset: 1px; }
+.break .break-amt .amt { font-size: 15px; }
+
+/* Old accounts: off every roster but still owing — greyed, never gone. */
+.person.old, .break.old { color: var(--ink-faded); }
+.person.old .dir, .break.old .dir { color: var(--ink-faded); }
+a.break.old .label { border-bottom-color: rgba(176, 168, 146, 0.6); }
+
+/* Cast strip for the line being written. Tap a name to leave them off it. */
+.cast-strip {
+  height: var(--line);
+  padding: 0 var(--content-r) 0 var(--content-x);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  overflow: hidden;
+}
+.cast-strip .cast-name {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--meta);
+  padding: 1px 8px;
+  border: 1px solid rgba(145, 136, 118, 0.35);
+  border-radius: 999px;
+  line-height: 16px;
+  margin-bottom: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+.cast-strip .cast-name:focus-visible { outline: 2px solid var(--margin-red); outline-offset: 1px; }
+/* Off this line: struck, dimmed — but still there to tap back on. */
+.cast-strip .cast-name.off {
+  opacity: 0.4;
+  text-decoration: line-through;
+  text-decoration-color: var(--margin-red);
+}
