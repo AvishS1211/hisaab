@@ -25,6 +25,7 @@ export function PersonPage({
   members,
   currentPersonId,
   onOpenHisaab,
+  onSwitchIdentity,
 }: {
   entries: Entry[];
   setEntries: React.Dispatch<React.SetStateAction<Entry[]>>;
@@ -33,7 +34,9 @@ export function PersonPage({
   members: HisaabMember[];
   currentPersonId: string;
   onOpenHisaab?: (hisaabId: string) => void;
+  onSwitchIdentity?: () => void;
 }) {
+  const meName = people.find((p) => p.id === currentPersonId)?.name ?? "?";
   const [settlingId, setSettlingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -153,6 +156,11 @@ export function PersonPage({
       <div className="deity">{deityLine.ganesh}</div>
       <div className="title-row">
         <span className="title">Accounts</span>
+        {onSwitchIdentity && (
+          <button type="button" className="whoami" onClick={onSwitchIdentity}>
+            {meName} · switch
+          </button>
+        )}
       </div>
       <div className="spacer-1" />
 

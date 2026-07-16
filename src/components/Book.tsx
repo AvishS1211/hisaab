@@ -1,10 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Entry, Hisaab, HisaabMember, Person } from "../lib/types";
+import { getIdentity, setIdentity, clearIdentity } from "../lib/identity";
+import { deityLine } from "../lib/deity";
 import { PersonPage } from "./PersonPage";
 import { GroupsPage } from "./GroupsPage";
 import { HisaabPage } from "./HisaabPage";
+import { WhoAreYou } from "./WhoAreYou";
 
 // The book. It owns all state and turns between three pages:
 //   profile (Accounts) ⇄ groups (Hisaabs) → a hisaab ledger
@@ -25,14 +28,36 @@ export function Book({
     people: Person[];
     hisaabs: Hisaab[];
     members: HisaabMember[];
-    currentPersonId: string;
   };
 }) {
   const [entries, setEntries] = useState<Entry[]>(seed.entries);
   const [people, setPeople] = useState<Person[]>(seed.people);
   const [hisaabs, setHisaabs] = useState<Hisaab[]>(seed.hisaabs);
   const [members, setMembers] = useState<HisaabMember[]>(seed.members);
-  const me = seed.currentPersonId;
+
+  // Who this device is. `undefined` = still reading storage (first paint),
+  // `null` = not chosen yet (show "Who are you?"), else the person id.
+  const [me, setMe] = useState<string | null | undefined>(undefined);
+  useEffect(() => setMe(getIdentity()), []);
+
+  function pickIdentity(personId: string) {
+    setIdentity(personId);
+    setMe(personId);
+  }
+  function addAndPickIdentity(name: string) {
+    const person: Person = {
+      id: crypto.randomUUID(),
+      name,
+      createdAt: new Date().toISOString(),
+    };
+    setPeople((prev) => [...prev, person]);
+    pickIdentity(person.id);
+  }
+  function switchIdentity() {
+    clearIdentity();
+    setMe(null);
+    setView({ name: "profile" });
+  }
 
   const [view, setView] = useState<View>({ name: "profile" });
   const [anim, setAnim] = useState<{ prev: View; dir: "fwd" | "back" } | null>(null);
@@ -65,7 +90,7 @@ export function Book({
     }
   }
 
-  function renderView(v: View) {
+  function renderView(v: View, meId: string) {
     if (v.name === "profile") {
       return (
         <PersonPage
@@ -74,8 +99,9 @@ export function Book({
           people={people}
           hisaabs={hisaabs}
           members={members}
-          currentPersonId={me}
+          currentPersonId={meId}
           onOpenHisaab={openHisaab}
+          onSwitchIdentity={switchIdentity}
         />
       );
     }
@@ -86,7 +112,7 @@ export function Book({
           people={people}
           hisaabs={hisaabs}
           members={members}
-          currentPersonId={me}
+          currentPersonId={meId}
           setPeople={setPeople}
           setHisaabs={setHisaabs}
           setMembers={setMembers}
@@ -106,10 +132,31 @@ export function Book({
         setEntries={setEntries}
         people={people}
         roster={roster}
-        currentPersonId={me}
+        currentPersonId={meId}
       />
     );
   }
+
+  // First paint / before storage is read: a quiet paper sheet.
+  if (me === undefined) {
+    return (
+      <div className="book">
+        <main className="sheet">
+          <div className="spacer-1" />
+          <div className="deity">{deityLine.ganesh}</div>
+        </main>
+      </div>
+    );
+  }
+  // Not signed in on this device yet.
+  if (me === null || !people.some((p) => p.id === me)) {
+    return (
+      <div className="book">
+        <WhoAreYou people={people} onPick={pickIdentity} onAdd={addAndPickIdentity} />
+      </div>
+    );
+  }
+  const meId: string = me;
 
   const hint =
     view.name === "profile"
@@ -127,23 +174,23 @@ export function Book({
       {anim ? (
         anim.dir === "fwd" ? (
           <>
-            <div className="page">{renderView(view)}</div>
+            <div className="page">{renderView(view, meId)}</div>
             <div className="page turning turn-out" onAnimationEnd={() => setAnim(null)}>
-              <div className="face front">{renderView(anim.prev)}</div>
+              <div className="face front">{renderView(anim.prev, meId)}</div>
               <div className="face back" />
             </div>
           </>
         ) : (
           <>
-            <div className="page">{renderView(anim.prev)}</div>
+            <div className="page">{renderView(anim.prev, meId)}</div>
             <div className="page turning turn-in" onAnimationEnd={() => setAnim(null)}>
-              <div className="face front">{renderView(view)}</div>
+              <div className="face front">{renderView(view, meId)}</div>
               <div className="face back" />
             </div>
           </>
         )
       ) : (
-        <div className="page-static">{renderView(view)}</div>
+        <div className="page-static">{renderView(view, meId)}</div>
       )}
 
       <div className="swipe-hint" aria-hidden="true">

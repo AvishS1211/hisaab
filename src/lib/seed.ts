@@ -4,7 +4,7 @@ import type { Person, Hisaab, HisaabMember, Entry } from "./types";
 // can show cross-group netting, a settlement, and an "Old accounts" entry.
 
 export const people: Person[] = [
-  { id: "p_you", name: "You", createdAt: "2026-07-10T09:00:00Z" },
+  { id: "p_you", name: "Avish", createdAt: "2026-07-10T09:00:00Z" },
   { id: "p_ravi", name: "Ravi", createdAt: "2026-07-10T09:00:00Z" },
   { id: "p_dev", name: "Dev", createdAt: "2026-07-10T09:00:00Z" },
   { id: "p_rohan", name: "Rohan", createdAt: "2026-07-10T09:00:00Z" },

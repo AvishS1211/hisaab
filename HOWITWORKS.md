@@ -4,7 +4,7 @@ Current architecture snapshot. Describes the present, not the plan — see CLAUD
 
 ## Where things stand
 
-Steps 1–4 of the build order are done plus the settle/strike gestures, group creation, and page-turn navigation. Home is a "book" that turns between the profile, the groups list, and a ledger. No Supabase and no identity yet — nothing survives a reload, and the current person is hardcoded to "You".
+Steps 1–4 of the build order are done, plus the settle/strike gestures, group creation, page-turn navigation, and identity (the "identity" half of step 5). Home is a "book" that turns between the profile, the groups list, and a ledger, all from the signed-in person's perspective. Persistence (Supabase) is not wired yet, so nothing survives a reload.
 
 ## Layout
 
@@ -17,6 +17,8 @@ src/lib/balance.test.ts  16 tests covering every rule the engine implements.
 src/lib/deity.ts     Deity → the Devanagari line inked at the top of the page.
 src/lib/parseLine.ts Likhna parsing: "Petrol 2400" → { label, amount }. 6 tests.
 src/lib/personView.ts  Builds the person page from the log: net + reconciling working. 6 tests.
+src/lib/identity.ts  device_id + chosen person_id in localStorage. No accounts.
+src/components/WhoAreYou.tsx  The name chooser shown until this device is signed in.
 src/lib/seed.ts      Hardcoded seed: two hisaabs (Goa, Ghar), a settlement, an old account.
 src/components/Book.tsx  The book: owns all state, turns between the three pages.
 src/components/PersonPage.tsx  Page 1 — Accounts: nets, working, settle gesture.
@@ -102,6 +104,18 @@ page is in normal flow so long ledgers scroll.
 
 Because the book holds the log, writes, strikes, settlements, and new groups
 persist across page turns (still client-state only until Supabase).
+
+## Identity
+
+`Book` gates on identity (`src/lib/identity.ts`, read from `localStorage` in an
+effect so SSR and first paint agree). Three states: `undefined` (still reading →
+a quiet deity-only sheet), `null` or an unknown id (→ `WhoAreYou`), or a person
+id (→ the book, from that person's perspective). Picking a name stores it; the
+"switch" control on Accounts clears it back to the chooser. There are no
+accounts and no passwords — tapping a name is the whole of signing in, and the
+same log renders differently per viewer (verified: Avish sees "Ravi owes you
+5,900", Ravi sees "you owe Avish 5,900"). The symmetry falls out of pairwise
+netting for free.
 
 ## The groups page (Hisaabs)
 
