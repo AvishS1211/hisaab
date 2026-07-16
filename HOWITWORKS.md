@@ -4,7 +4,7 @@ Current architecture snapshot. Describes the present, not the plan — see CLAUD
 
 ## Where things stand
 
-Steps 1–5 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, identity, and Supabase persistence with realtime sync. The book loads the log from Supabase, appends to it, and merges live inserts; it falls back to the in-memory seed when no project is configured. Remaining: share links + OG image (step 6), PWA/offline (step 7), sessions (step 8).
+Steps 1–5 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, scoped identity via join links, and Supabase persistence with realtime sync. The book loads the log from Supabase, appends to it, and merges live inserts; it falls back to the in-memory seed when no project is configured. Remaining: view links + OG image (rest of step 6), PWA/offline (step 7), sessions (step 8).
 
 ## Layout
 
@@ -20,17 +20,22 @@ src/lib/personView.ts  Builds the person page from the log: net + reconciling wo
 src/lib/identity.ts  device_id + chosen person_id in localStorage. No accounts.
 src/lib/supabase.ts  The browser client (null when env vars are absent).
 src/lib/db.ts        Append-only data layer: fetchAll, insert*, realtime subscribe.
-src/components/WhoAreYou.tsx  The name chooser shown until this device is signed in.
+src/components/WhoAreYou.tsx  The name chooser — always scoped by the caller (a
+                     hisaab's roster, or nothing) — never a global directory.
 db/supabase-setup.sql  One-time SQL to run in the project (schema + RLS + realtime).
 .env.example         The two NEXT_PUBLIC vars; copy to .env.local (gitignored).
 src/lib/seed.ts      Hardcoded seed: two hisaabs (Goa, Ghar), a settlement, an old account.
-src/components/Book.tsx  The book: owns all state, turns between the three pages.
-src/components/PersonPage.tsx  Page 1 — Accounts: nets, working, settle gesture.
+src/components/Book.tsx  The book: owns all state, scopes it by membership, turns
+                     between the three pages, handles the join-link flow.
+src/components/PersonPage.tsx  Page 1 — Accounts: masthead (name + overall net),
+                     per-person breakdown, settle gesture.
 src/components/GroupsPage.tsx  Page 2 — Hisaabs: the group list + the new-hisaab composer.
-src/components/HisaabPage.tsx  Page 3 — a ledger: entries, write flow, tap-to-strike.
+src/components/HisaabPage.tsx  Page 3 — a ledger: entries, write flow, tap-to-strike,
+                     the "invite" (copy join link) button.
 app/layout.tsx       Root layout; loads globals.css.
 app/globals.css      Tokens + the paper: font faces, ruled background, rhythm, page-turn.
-app/page.tsx         Home → the Book.
+app/page.tsx         Home → the Book (bootstrap mode: no joinHisaabId).
+app/join/[hisaabId]/page.tsx  A hisaab's join link → the Book, scoped to that hisaab.
 app/hisaab/[id]/page.tsx  Redirects to home; navigation lives inside the book now.
 public/fonts/        Self-hosted Kalam woff2 (Latin + Devanagari, 300/400/700).
 ```
@@ -61,11 +66,11 @@ label — integer rupees only), tap cast chips to leave people off *this* line,
 and Enter commits. On commit the draft appends to entry state, the input clears,
 the cursor stays, and the cast resets to the full roster for the next line.
 
-- **Payer of a new line = the current person** (hardcoded "You" for now). There
+- **Payer of a new line = the current person** (the signed-in identity). There
   is no payer picker; see the JOURNAL entry for why, and the open question of
   recording that someone *else* paid (the guest-paid-for-petrol case).
-- New lines live in React state only. No persistence yet — Supabase is a later
-  step, and because the log is append-only, a write is just an insert.
+- New lines persist via `onAddEntries` → Supabase (see Persistence below); the
+  log is append-only, so a write is just an insert.
 - **Tap-to-strike:** each expense line is a `<button>`; tapping it appends a
   `strike` targeting it, tapping a struck line appends a strike targeting the
   live strike (undo). Struck lines stay on the page, greyed. Note: the line
@@ -75,11 +80,16 @@ the cursor stays, and the cast resets to the full roster for the next line.
 ## The person page (home)
 
 `app/page.tsx` → `PersonPage`, driven by `buildPersonPage` (`personView.ts`).
-For the current person it lists every other person with a non-zero net: one
-signed number (the direction is words — "you owe" / "owes you"), then the
-working beneath — one line per hisaab (gross, linking to that ledger) plus one
-line per settlement between the two of you.
+It opens with a masthead — the signed-in name and one overall net figure
+("you owe ₹X" / "you're owed ₹X" / "you're all settled up"), summed across
+everyone — then lists every other person with a non-zero net: one signed
+number (the direction is words — "you owe" / "owes you"), then the working
+beneath — one line per hisaab (gross, linking to that ledger) plus one line
+per settlement between the two of you.
 
+- **The masthead is the page's own instance of "show the number, then the
+  working"** (§1) — one level up from the per-person rows, which are already
+  that rule applied to each person.
 - **The working always reconciles to the total** (asserted in tests). Group
   lines carry the gross expense nets; settlement lines carry the rest. Because a
   group page is gross forever but the total nets settlements in, the settlement
@@ -87,6 +97,8 @@ line per settlement between the two of you.
 - **Old accounts** = people off *every* roster who are still non-zero (Sameer).
   Greyed, below the active ones. Zero + off-roster disappears silently (§5).
 - Sorted by magnitude, biggest balance first. Home uses the ganesh deity line.
+- `people`/`hisaabs` are pre-scoped by `Book` to this person's own circle — see
+  Identity below.
 
 ## The book (navigation)
 
@@ -128,27 +140,60 @@ When `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set,
 - With no project configured, `supabase` is null, every db function no-ops, and
   the app runs on the in-memory seed exactly as before.
 
-## Identity
+## Identity and scope
 
-`Book` gates on identity (`src/lib/identity.ts`, read from `localStorage` in an
-effect so SSR and first paint agree). Three states: `undefined` (still reading →
-a quiet deity-only sheet), `null` or an unknown id (→ `WhoAreYou`), or a person
-id (→ the book, from that person's perspective). Picking a name stores it; the
-"switch" control on Accounts clears it back to the chooser. There are no
-accounts and no passwords — tapping a name is the whole of signing in, and the
-same log renders differently per viewer (verified: Avish sees "Ravi owes you
-5,900", Ravi sees "you owe Avish 5,900"). The symmetry falls out of pairwise
-netting for free.
+Identity is **scoped**, not global — there is no screen anywhere that lists
+every person who has ever used the app. This was a real bug fixed after launch:
+the first cut had one "Who are you?" directory covering every hisaab in the
+database, so any device could pick any name and immediately see every group.
+The fix, matching CLAUDE.md §6 (join links), is now the whole model:
+
+- **Bootstrap** (`app/page.tsx`, no `joinHisaabId`): a device with no identity
+  can only *write its own name* — `WhoAreYou` is passed `people={[]}`, so there
+  is no list to browse at all. This alone closes "pick someone else's name from
+  a directory." A fresh identity here has zero hisaabs and lands on the Hisaabs
+  page to create or be invited into one.
+- **Join link** (`app/join/[hisaabId]/page.tsx`): the shared secret that grants
+  write access to *one* hisaab (§6). A device with no identity sees only that
+  hisaab's own roster (`WhoAreYou` scoped to `members.filter(hisaabId===...)`)
+  plus "add new" for a genuine newcomer. A device that's *already* signed in
+  skips the chooser entirely — it's silently added to that hisaab's roster (if
+  not already on it) and dropped straight into the ledger.
+- **`Book` derives `myHisaabs`/`myPeople`** every render from `hisaab_members`:
+  the hisaabs this person belongs to, and the union of everyone who shares any
+  of those hisaabs (plus themselves). These scoped lists — not the raw
+  `hisaabs`/`people` state — are what get passed to `PersonPage`, `GroupsPage`,
+  and `HisaabPage`. Opening a `{name:"hisaab", id}` view is also gated: if `id`
+  isn't in `myHisaabIds`, it renders nothing. Nobody sees a hisaab, or a
+  person, they don't actually share one with.
+- **No password, no OTP, no accounts** (§2 stands) — tapping/writing a name is
+  still the whole of signing in. What changed is *which* names and *which*
+  hisaabs are ever shown to a given device. The join link itself is the secret;
+  anyone holding it can still claim any name on that one roster (the accepted
+  "steal the physical notebook" risk) — but a stranger with no link sees nothing.
+- **No switch control.** Once a device picks a name, that's final in the UI —
+  as sticky as a physical notebook. (`clearIdentity()` still exists in
+  `identity.ts` for a future deliberate reset flow; nothing calls it today.)
+- The masthead symmetry still holds (verified): Avish sees "Ravi owes you
+  5,900", Ravi sees "you owe Avish 5,900" — falls out of pairwise netting free.
 
 ## The groups page (Hisaabs)
 
-Lists every hisaab with your standing in it ("you're owed X" — the sum of your
-pairwise nets inside that group, gross of settlements). Below, the new-hisaab
-composer: a name line, a rolling/trip toggle, cast chips over everyone in
-`people` (tap to include), and an "add a name" line that creates a new Person
-and adds them to the cast. Creating assigns the deity by alternation
-(`hisaabs.length % 2`), makes everyone in the cast an on-roster member, and
-turns straight into the new ledger.
+Lists your hisaabs (`myHisaabs`, scoped — see above) with your standing in each
+("you're owed X" — the sum of your pairwise nets inside that group, gross of
+settlements). Below, the new-hisaab composer: a name line, a rolling/trip
+toggle, cast chips over `myPeople` (your existing circle — tap to include), and
+an "add a name" line that creates a brand-new Person and adds them to the cast.
+Creating assigns the deity by alternation (`hisaabs.length % 2`), makes
+everyone in the cast an on-roster member, and turns straight into the new
+ledger.
+
+**A new person + an immediate dependent insert is a real race**, fixed twice
+over here: `Book.addPerson` is `async` and awaited before any insert that
+references that person's id (a `hisaab_members` row, e.g.) — otherwise the
+foreign key can reach Postgres before the person row does. `GroupsPage` mirrors
+this with a `pendingPeople` ref of in-flight inserts, awaited in `create()`
+before the hisaab (and its member rows) go out.
 
 ### The settle gesture (Chukta)
 

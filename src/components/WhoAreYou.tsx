@@ -6,12 +6,19 @@ import { deityLine } from "../lib/deity";
 
 // The whole of signing in: tap your name. If you're not on the page yet, write
 // it. No email, no password, no OTP. (CLAUDE.md §2.)
+//
+// `people` is deliberately scoped by the caller — either a specific hisaab's
+// roster (arriving via its join link) or empty (bootstrapping a brand-new
+// device with no context, where the only option is to write your own name).
+// This screen never browses a global directory of every person in the app.
 export function WhoAreYou({
   people,
+  subtitle,
   onPick,
   onAdd,
 }: {
   people: Person[];
+  subtitle?: string;
   onPick: (personId: string) => void;
   onAdd: (name: string) => void;
 }) {
@@ -31,6 +38,11 @@ export function WhoAreYou({
       <div className="title-row">
         <span className="title">Who are you?</span>
       </div>
+      {subtitle && (
+        <div className="title-row">
+          <span className="join-subtitle">{subtitle}</span>
+        </div>
+      )}
       <div className="spacer-1" />
 
       {people.map((p) => (

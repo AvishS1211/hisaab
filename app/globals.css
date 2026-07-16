@@ -135,8 +135,9 @@ body {
 }
 .title .kind { font-weight: 400; opacity: 0.8; }
 
-/* Who this device is signed in as; tap to switch. */
-.whoami {
+/* Copies this hisaab's join link — the shared secret that grants write access
+   to it (CLAUDE.md §6). Not a general "share"; scoped to one hisaab. */
+.invite-link {
   border: none;
   background: transparent;
   font-family: var(--sans);
@@ -147,11 +148,47 @@ body {
   margin-bottom: 2px;
   align-self: flex-end;
 }
-.whoami:hover { color: var(--ink); }
+.invite-link:hover { color: var(--ink); }
 
 /* A name to tap on the "Who are you?" page. */
 .who-choice .label { font-size: 21px; }
 button.who-choice:hover .label { color: var(--margin-red); }
+
+/* Context line under "Who are you?" when arriving via a hisaab's join link —
+   which hisaab's roster is being shown. */
+.join-subtitle {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--meta);
+}
+
+/* The page-1 masthead: signed-in name + the one overall number. Same "show the
+   number" rule as .person, one level up — the whole page's headline. */
+.me-row {
+  height: var(--line);
+  padding: 0 var(--content-r) 0 var(--content-x);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--hand);
+  line-height: var(--line);
+}
+.me-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.me-net {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: 12px;
+}
 
 /* Cast strip — who lines default to. Read-only in step 2. */
 .cast-row {

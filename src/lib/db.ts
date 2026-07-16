@@ -124,6 +124,13 @@ export async function insertHisaab(hisaab: Hisaab, members: HisaabMember[]): Pro
   }
 }
 
+/** Add one person to one hisaab's roster (joining via a join link, or mid-trip). */
+export async function insertMember(member: HisaabMember): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("hisaab_members").insert(memberRow(member));
+  if (error) throw error;
+}
+
 // ── realtime ─────────────────────────────────────────────────────────────────
 export interface RealtimeHandlers {
   onPerson: (p: Person) => void;

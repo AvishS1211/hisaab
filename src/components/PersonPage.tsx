@@ -14,9 +14,18 @@ function direction(youOwe: number): { verb: string; amount: number } {
     : { verb: "owes you", amount: -youOwe };
 }
 
-// The person page (profile): net per person, then the working, then Old accounts.
-// Tapping a person's number settles (Chukta): write the payment, balance moves
-// immediately — no confirm. State is owned by the Book. (§2, §4.)
+// The masthead line: your name, then your one overall number — the page-level
+// instance of "show the number, then the working" (§1). The per-person list
+// beneath it is the working.
+function overallLine(net: number): string {
+  if (net === 0) return "you're all settled up";
+  return net > 0 ? `you owe ${inr(net)}` : `you're owed ${inr(-net)}`;
+}
+
+// The person page (profile): your name + overall net, then per-person breakdown,
+// then Old accounts. Tapping a person's number settles (Chukta): write the
+// payment, balance moves immediately — no confirm. State is owned by the Book.
+// Scoped to hisaabs this person actually belongs to — see Book.tsx. (§1, §2, §4.)
 export function PersonPage({
   entries,
   onAddEntries,
@@ -25,7 +34,6 @@ export function PersonPage({
   members,
   currentPersonId,
   onOpenHisaab,
-  onSwitchIdentity,
 }: {
   entries: Entry[];
   onAddEntries: (entries: Entry[]) => void;
@@ -34,13 +42,13 @@ export function PersonPage({
   members: HisaabMember[];
   currentPersonId: string;
   onOpenHisaab?: (hisaabId: string) => void;
-  onSwitchIdentity?: () => void;
 }) {
   const meName = people.find((p) => p.id === currentPersonId)?.name ?? "?";
   const [settlingId, setSettlingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
   const { active, old } = buildPersonPage(entries, people, hisaabs, members, currentPersonId);
+  const overallNet = [...active, ...old].reduce((t, s) => t + s.youOwe, 0);
 
   function startSettle(s: PersonSummary) {
     if (settlingId === s.person.id) {
@@ -156,17 +164,12 @@ export function PersonPage({
       <div className="deity">{deityLine.ganesh}</div>
       <div className="title-row">
         <span className="title">Accounts</span>
-        {onSwitchIdentity && (
-          <button type="button" className="whoami" onClick={onSwitchIdentity}>
-            {meName} · switch
-          </button>
-        )}
+      </div>
+      <div className="me-row">
+        <span className="me-name">{meName}</span>
+        <span className="me-net">{overallLine(overallNet)}</span>
       </div>
       <div className="spacer-1" />
-
-      {active.length === 0 && old.length === 0 && (
-        <div className="entry"><span className="label empty-note">All settled up.</span></div>
-      )}
 
       {active.map((s) => renderPerson(s, false))}
 

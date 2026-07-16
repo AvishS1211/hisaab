@@ -159,6 +159,24 @@ Dev paid 1200            you owe Dev
 
 ---
 
+## 2026-07-16 — Identity was global; it should have been scoped from day one
+
+**Context:** Avish reported it plainly: Ravi could open the app, type "Lalla" (someone else's name from a totally different trip), and be let straight in — seeing every hisaab and every person in the whole system. Also flagged: the "switch identity" button had no business existing, and the home page needed to actually lead with a name and a number.
+
+**What was actually wrong:** not the trust model — CLAUDE.md §2 already accepts that a tapped name can be a lie, same as someone grabbing the physical notebook. The bug was that identity had no *boundary*. The very first "Who are you?" screen was a single global directory of every person ever created, across every hisaab, and picking one dropped you into the entire database — every group, every ledger, no membership check anywhere. §6 already specifies the fix (join links, scoped per hisaab); step 5 shipped identity without it.
+
+**Resolution:** two identity paths, never a directory of strangers.
+- **Bootstrap** (bare `/`, no hisaab context): you can only *write* your own name. No list to browse — there is nothing to pick that isn't yours.
+- **Join link** (`/join/<hisaabId>`, the actual shared secret per §6): shows only that one hisaab's roster, plus "add new" for a genuine guest. An already-identified device skips the chooser and is just added to the roster.
+
+`Book` now derives `myHisaabs`/`myPeople` from `hisaab_members` every render and scopes every page to it; opening a hisaab you're not a member of renders nothing. The "switch" button — my own testing convenience, never part of the spec — is gone; identity is sticky per device, as intended.
+
+**A race condition hid inside the fix.** The join-as-new-guest path creates a person and a membership row back to back; those are two separate async inserts with no ordering guarantee, so the membership's foreign key could reach Postgres before the person row did. Worse: an effect meant only for "already-signed-in device opens a join link" was also firing the instant `joinAsNew` set the new identity, so *two* membership inserts raced each other — the second colliding on the primary key. Both needed fixing: await the person insert before anything references it, and make the explicit join functions mark the auto-join effect as already-handled so it can't double-fire. Caught by actually reading the raw error text instead of trusting a shallow console log, and confirmed by querying the table directly rather than trusting the optimistic UI.
+
+**Lesson:** "no accounts, no passwords" (§2) and "no directory of strangers" are two different guarantees, and I'd only built the first. A trust object still needs a boundary around *which* trust circle you're in — the shopkeeper's book is passed to one shop's regulars, not laid open on the street. Also: when a bug report says "there's no authentication," don't reach for auth — check whether scope, not identity, is what's actually missing.
+
+---
+
 ## 2026-07-16 — Step 5: persistence was cheap because the log was append-only
 
 **Context:** Wired the log to Supabase. The whole storage layer is `fetchAll` + four `insert`s + a realtime subscription — no update paths, no conflict resolution, no migrations of derived state. This is the append-only bet from day one paying out: writes are inserts, balances are recomputed on read, so "sync" is just "append the same rows everywhere."

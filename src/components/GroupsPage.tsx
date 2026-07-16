@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Entry, Hisaab, HisaabKind, HisaabMember, Person } from "../lib/types";
 import { groupBalances, netBetween } from "../lib/balance";
 import { deityLine } from "../lib/deity";
@@ -24,7 +24,7 @@ export function GroupsPage({
   hisaabs: Hisaab[];
   members: HisaabMember[];
   currentPersonId: string;
-  onAddPerson: (person: Person) => void;
+  onAddPerson: (person: Person) => Promise<void>;
   onAddHisaab: (hisaab: Hisaab, members: HisaabMember[]) => void;
   onOpenHisaab: (hisaabId: string) => void;
 }) {
@@ -34,6 +34,10 @@ export function GroupsPage({
   const [kind, setKind] = useState<HisaabKind>("trip");
   const [cast, setCast] = useState<Set<string>>(() => new Set([currentPersonId]));
   const [newName, setNewName] = useState("");
+  // A newly-added person's insert may still be in flight when the hisaab is
+  // created; await it first so the membership row's foreign key doesn't race
+  // ahead of the person row it points at.
+  const pendingPeople = useRef<Promise<void>[]>([]);
 
   // Your standing within a group: sum of your pairwise nets among its expenses.
   function myNet(hisaabId: string): number {
@@ -66,14 +70,16 @@ export function GroupsPage({
       name: trimmed,
       createdAt: new Date().toISOString(),
     };
-    onAddPerson(person);
+    pendingPeople.current.push(onAddPerson(person));
     setCast((prev) => new Set(prev).add(person.id));
     setNewName("");
   }
 
-  function create() {
+  async function create() {
     const trimmed = name.trim();
     if (trimmed === "" || cast.size === 0) return;
+    await Promise.all(pendingPeople.current);
+    pendingPeople.current = [];
     const id = crypto.randomUUID();
     const hisaab: Hisaab = {
       id,

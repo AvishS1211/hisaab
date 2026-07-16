@@ -37,6 +37,20 @@ export function HisaabPage({
   // chip toggles that person off (or back on) for the line being written.
   const [cast, setCast] = useState<Set<string>>(() => new Set(roster));
   const inputRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  // The join link is the only "secret" gating this hisaab (CLAUDE.md §6) — copy
+  // it to share with whoever should get write access next.
+  function copyJoinLink() {
+    const url = `${window.location.origin}/join/${hisaab.id}`;
+    navigator.clipboard
+      ?.writeText(url)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {});
+  }
 
   const live = liveEntryIds(entries);
   const expenses = entries.filter(
@@ -104,6 +118,9 @@ export function HisaabPage({
         <span className="title">
           {hisaab.name} <span className="kind">· {hisaab.kind}</span>
         </span>
+        <button type="button" className="invite-link" onClick={copyJoinLink}>
+          {copied ? "copied" : "invite"}
+        </button>
       </div>
       <div className="spacer-1" />
 
