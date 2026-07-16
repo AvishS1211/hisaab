@@ -15,9 +15,8 @@ export function GroupsPage({
   hisaabs,
   members,
   currentPersonId,
-  setPeople,
-  setHisaabs,
-  setMembers,
+  onAddPerson,
+  onAddHisaab,
   onOpenHisaab,
 }: {
   entries: Entry[];
@@ -25,9 +24,8 @@ export function GroupsPage({
   hisaabs: Hisaab[];
   members: HisaabMember[];
   currentPersonId: string;
-  setPeople: React.Dispatch<React.SetStateAction<Person[]>>;
-  setHisaabs: React.Dispatch<React.SetStateAction<Hisaab[]>>;
-  setMembers: React.Dispatch<React.SetStateAction<HisaabMember[]>>;
+  onAddPerson: (person: Person) => void;
+  onAddHisaab: (hisaab: Hisaab, members: HisaabMember[]) => void;
   onOpenHisaab: (hisaabId: string) => void;
 }) {
   const nameOf = (id: string) => people.find((p) => p.id === id)?.name ?? "?";
@@ -68,7 +66,7 @@ export function GroupsPage({
       name: trimmed,
       createdAt: new Date().toISOString(),
     };
-    setPeople((prev) => [...prev, person]);
+    onAddPerson(person);
     setCast((prev) => new Set(prev).add(person.id));
     setNewName("");
   }
@@ -90,8 +88,7 @@ export function GroupsPage({
       personId,
       onRoster: true,
     }));
-    setHisaabs((prev) => [...prev, hisaab]);
-    setMembers((prev) => [...prev, ...newMembers]);
+    onAddHisaab(hisaab, newMembers);
     setName("");
     setCast(new Set([currentPersonId]));
     onOpenHisaab(id);

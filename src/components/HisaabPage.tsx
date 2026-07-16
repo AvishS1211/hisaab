@@ -17,14 +17,14 @@ const initial = (name: string) => name.slice(0, 1).toUpperCase();
 export function HisaabPage({
   hisaab,
   entries,
-  setEntries,
+  onAddEntries,
   people,
   roster,
   currentPersonId,
 }: {
   hisaab: Hisaab;
   entries: Entry[];
-  setEntries: React.Dispatch<React.SetStateAction<Entry[]>>;
+  onAddEntries: (entries: Entry[]) => void;
   people: Person[];
   roster: string[];
   currentPersonId: string;
@@ -74,7 +74,7 @@ export function HisaabPage({
           .map((e) => makeStrike(e.id))
       : [makeStrike(target.id)];
 
-    setEntries((prev) => [...prev, ...additions]);
+    onAddEntries(additions);
   }
 
   function commit() {
@@ -90,7 +90,7 @@ export function HisaabPage({
       authoredBy: currentPersonId,
       createdAt: new Date().toISOString(),
     };
-    setEntries((prev) => [...prev, entry]);
+    onAddEntries([entry]);
     setDraft("");
     setCast(new Set(roster)); // next line starts from the full cast again
     inputRef.current?.focus();

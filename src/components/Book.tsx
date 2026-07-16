@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Entry, Hisaab, HisaabMember, Person } from "../lib/types";
 import { getIdentity, setIdentity, clearIdentity } from "../lib/identity";
+import { isSupabaseConfigured } from "../lib/supabase";
+import { fetchAll, insertEntries, insertPerson, insertHisaab, subscribe } from "../lib/db";
 import { deityLine } from "../lib/deity";
 import { PersonPage } from "./PersonPage";
 import { GroupsPage } from "./GroupsPage";
@@ -11,14 +13,28 @@ import { WhoAreYou } from "./WhoAreYou";
 
 // The book. It owns all state and turns between three pages:
 //   profile (Accounts) ⇄ groups (Hisaabs) → a hisaab ledger
-// Swipe right-to-left to go deeper, left-to-right to come back — each with a
-// page turn. Because the book holds the log, writes/strikes/settlements persist
-// as you move between pages.
+// When Supabase is configured the log lives there — the book loads it, appends
+// to it, and merges realtime inserts so flatmates sync live. Otherwise it runs
+// on the in-memory seed.
 
 type View =
   | { name: "profile" }
   | { name: "groups" }
   | { name: "hisaab"; id: string };
+
+// Append rows we haven't seen (dedupe by id — a locally-inserted row echoes back
+// over realtime, and must not double up).
+const mergeById = <T extends { id: string }>(prev: T[], incoming: T[]): T[] => {
+  const seen = new Set(prev.map((x) => x.id));
+  const add = incoming.filter((x) => !seen.has(x.id));
+  return add.length ? [...prev, ...add] : prev;
+};
+const memberKey = (m: HisaabMember) => `${m.hisaabId}:${m.personId}`;
+const mergeMembers = (prev: HisaabMember[], incoming: HisaabMember[]): HisaabMember[] => {
+  const seen = new Set(prev.map(memberKey));
+  const add = incoming.filter((m) => !seen.has(memberKey(m)));
+  return add.length ? [...prev, ...add] : prev;
+};
 
 export function Book({
   seed,
@@ -30,13 +46,58 @@ export function Book({
     members: HisaabMember[];
   };
 }) {
-  const [entries, setEntries] = useState<Entry[]>(seed.entries);
-  const [people, setPeople] = useState<Person[]>(seed.people);
-  const [hisaabs, setHisaabs] = useState<Hisaab[]>(seed.hisaabs);
-  const [members, setMembers] = useState<HisaabMember[]>(seed.members);
+  const configured = isSupabaseConfigured;
+  const [entries, setEntries] = useState<Entry[]>(configured ? [] : seed.entries);
+  const [people, setPeople] = useState<Person[]>(configured ? [] : seed.people);
+  const [hisaabs, setHisaabs] = useState<Hisaab[]>(configured ? [] : seed.hisaabs);
+  const [members, setMembers] = useState<HisaabMember[]>(configured ? [] : seed.members);
+  const [ready, setReady] = useState(!configured);
 
-  // Who this device is. `undefined` = still reading storage (first paint),
-  // `null` = not chosen yet (show "Who are you?"), else the person id.
+  // Load the log and subscribe to live inserts.
+  useEffect(() => {
+    if (!configured) return;
+    let active = true;
+    fetchAll()
+      .then((snap) => {
+        if (!active) return;
+        setPeople(snap.people);
+        setHisaabs(snap.hisaabs);
+        setMembers(snap.members);
+        setEntries(snap.entries);
+        setReady(true);
+      })
+      .catch((err) => {
+        console.error("Hisaab: failed to load from Supabase", err);
+        setReady(true);
+      });
+    const unsub = subscribe({
+      onPerson: (p) => setPeople((prev) => mergeById(prev, [p])),
+      onHisaab: (h) => setHisaabs((prev) => mergeById(prev, [h])),
+      onMember: (m) => setMembers((prev) => mergeMembers(prev, [m])),
+      onEntry: (e) => setEntries((prev) => mergeById(prev, [e])),
+    });
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [configured]);
+
+  // ── actions: optimistic local update, then persist (append-only) ──
+  function addEntries(newEntries: Entry[]) {
+    setEntries((prev) => mergeById(prev, newEntries));
+    insertEntries(newEntries).catch((err) => console.error("Hisaab: insert entries failed", err));
+  }
+  function addPerson(person: Person) {
+    setPeople((prev) => mergeById(prev, [person]));
+    insertPerson(person).catch((err) => console.error("Hisaab: insert person failed", err));
+  }
+  function addHisaab(hisaab: Hisaab, newMembers: HisaabMember[]) {
+    setHisaabs((prev) => mergeById(prev, [hisaab]));
+    setMembers((prev) => mergeMembers(prev, newMembers));
+    insertHisaab(hisaab, newMembers).catch((err) => console.error("Hisaab: insert hisaab failed", err));
+  }
+
+  // ── identity ──
   const [me, setMe] = useState<string | null | undefined>(undefined);
   useEffect(() => setMe(getIdentity()), []);
 
@@ -50,7 +111,7 @@ export function Book({
       name,
       createdAt: new Date().toISOString(),
     };
-    setPeople((prev) => [...prev, person]);
+    addPerson(person);
     pickIdentity(person.id);
   }
   function switchIdentity() {
@@ -59,6 +120,7 @@ export function Book({
     setView({ name: "profile" });
   }
 
+  // ── navigation ──
   const [view, setView] = useState<View>({ name: "profile" });
   const [anim, setAnim] = useState<{ prev: View; dir: "fwd" | "back" } | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -81,10 +143,8 @@ export function Book({
     const dy = e.clientY - s.y;
     if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // not a horizontal swipe
     if (dx < 0) {
-      // right-to-left → go deeper
       if (view.name === "profile") navigate({ name: "groups" }, "fwd");
     } else {
-      // left-to-right → come back
       if (view.name === "groups") navigate({ name: "profile" }, "back");
       else if (view.name === "hisaab") navigate({ name: "groups" }, "back");
     }
@@ -95,7 +155,7 @@ export function Book({
       return (
         <PersonPage
           entries={entries}
-          setEntries={setEntries}
+          onAddEntries={addEntries}
           people={people}
           hisaabs={hisaabs}
           members={members}
@@ -113,9 +173,8 @@ export function Book({
           hisaabs={hisaabs}
           members={members}
           currentPersonId={meId}
-          setPeople={setPeople}
-          setHisaabs={setHisaabs}
-          setMembers={setMembers}
+          onAddPerson={addPerson}
+          onAddHisaab={addHisaab}
           onOpenHisaab={openHisaab}
         />
       );
@@ -129,7 +188,7 @@ export function Book({
       <HisaabPage
         hisaab={h}
         entries={entries}
-        setEntries={setEntries}
+        onAddEntries={addEntries}
         people={people}
         roster={roster}
         currentPersonId={meId}
@@ -137,8 +196,8 @@ export function Book({
     );
   }
 
-  // First paint / before storage is read: a quiet paper sheet.
-  if (me === undefined) {
+  // Still reading storage or loading the log: a quiet paper sheet.
+  if (me === undefined || !ready) {
     return (
       <div className="book">
         <main className="sheet">
@@ -148,7 +207,7 @@ export function Book({
       </div>
     );
   }
-  // Not signed in on this device yet.
+  // Not signed in on this device yet (or signed in as someone the log doesn't know).
   if (me === null || !people.some((p) => p.id === me)) {
     return (
       <div className="book">

@@ -19,7 +19,7 @@ function direction(youOwe: number): { verb: string; amount: number } {
 // immediately — no confirm. State is owned by the Book. (§2, §4.)
 export function PersonPage({
   entries,
-  setEntries,
+  onAddEntries,
   people,
   hisaabs,
   members,
@@ -28,7 +28,7 @@ export function PersonPage({
   onSwitchIdentity,
 }: {
   entries: Entry[];
-  setEntries: React.Dispatch<React.SetStateAction<Entry[]>>;
+  onAddEntries: (entries: Entry[]) => void;
   people: Person[];
   hisaabs: Hisaab[];
   members: HisaabMember[];
@@ -65,7 +65,7 @@ export function PersonPage({
       authoredBy: currentPersonId,
       createdAt: new Date().toISOString(),
     };
-    setEntries((prev) => [...prev, entry]);
+    onAddEntries([entry]);
     setSettlingId(null);
     setDraft("");
   }
