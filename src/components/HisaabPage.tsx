@@ -5,9 +5,11 @@ import type { Entry, Hisaab, Person } from "../lib/types";
 import { liveEntryIds } from "../lib/balance";
 import { deityLine } from "../lib/deity";
 import { parseLine } from "../lib/parseLine";
+import { currentDefaultCast } from "../lib/sessions";
 import { inr } from "../lib/format";
 
 const initial = (name: string) => name.slice(0, 1).toUpperCase();
+const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 // The hisaab page with the write flow. There is no add button: the next ruled
 // line is always open with the cursor in it. Type "Petrol 2400", tap a name to
@@ -33,9 +35,13 @@ export function HisaabPage({
     people.find((p) => p.id === id)?.name ?? "?";
 
   const [draft, setDraft] = useState("");
-  // Who this next line is split across. Defaults to the full roster; tapping a
-  // chip toggles that person off (or back on) for the line being written.
-  const [cast, setCast] = useState<Set<string>>(() => new Set(roster));
+  // Who this next line is split across. Defaults to the roster, narrowed by
+  // the most recent session divider if there is one ("Dev's not here" — see
+  // CLAUDE.md's Sessions section); tapping a chip toggles someone for just
+  // this one line.
+  const [cast, setCast] = useState<Set<string>>(
+    () => new Set(currentDefaultCast(entries, hisaab.id, roster)),
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const [copiedViewFor, setCopiedViewFor] = useState<string | null>(null);
@@ -67,9 +73,12 @@ export function HisaabPage({
   }
 
   const live = liveEntryIds(entries);
-  const expenses = entries.filter(
-    (e) => e.kind === "expense" && e.hisaabId === hisaab.id,
-  );
+  // Expenses and session dividers share the page, chronologically — a session
+  // is a real line on the ledger, not a UI-only marker (CLAUDE.md's Sessions
+  // section: "do not create a session table — the entries carry the truth").
+  const lines = entries
+    .filter((e) => (e.kind === "expense" || e.kind === "session") && e.hisaabId === hisaab.id)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const parsed = parseLine(draft);
 
   function toggleCast(id: string) {
@@ -106,21 +115,47 @@ export function HisaabPage({
   }
 
   function commit() {
-    if (parsed.amount === null || cast.size === 0) return;
-    const entry: Entry = {
+    const trimmed = draft.trim();
+    if (trimmed === "") return;
+
+    if (parsed.amount !== null) {
+      if (cast.size === 0) return;
+      const entry: Entry = {
+        id: crypto.randomUUID(),
+        hisaabId: hisaab.id,
+        kind: "expense",
+        label: parsed.label,
+        amount: parsed.amount,
+        payerId: currentPersonId,
+        splitIds: roster.filter((id) => cast.has(id)),
+        authoredBy: currentPersonId,
+        createdAt: new Date().toISOString(),
+      };
+      onAddEntries([entry]);
+      setDraft("");
+      // Next line starts from the current default again — the roster, unless
+      // a session divider has narrowed it.
+      setCast(new Set(currentDefaultCast(entries, hisaab.id, roster)));
+      inputRef.current?.focus();
+      return;
+    }
+
+    // No trailing number — a session divider, not an expense: "Dev's not
+    // here" sets the default cast for every line after it, until changed
+    // again. The cast strip's current selection *is* the new default.
+    const newDefault = roster.filter((id) => cast.has(id));
+    const divider: Entry = {
       id: crypto.randomUUID(),
       hisaabId: hisaab.id,
-      kind: "expense",
-      label: parsed.label,
-      amount: parsed.amount,
-      payerId: currentPersonId,
-      splitIds: roster.filter((id) => cast.has(id)),
+      kind: "session",
+      label: trimmed,
+      splitIds: newDefault,
       authoredBy: currentPersonId,
       createdAt: new Date().toISOString(),
     };
-    onAddEntries([entry]);
+    onAddEntries([divider]);
     setDraft("");
-    setCast(new Set(roster)); // next line starts from the full cast again
+    setCast(new Set(newDefault));
     inputRef.current?.focus();
   }
 
@@ -138,8 +173,22 @@ export function HisaabPage({
       </div>
       <div className="spacer-1" />
 
-      {expenses.map((e) => {
+      {lines.map((e) => {
         const struck = !live.has(e.id);
+        if (e.kind === "session") {
+          return (
+            <button
+              type="button"
+              key={e.id}
+              className={struck ? "entry session struck" : "entry session"}
+              aria-label={struck ? `Undo strike on session: ${e.label}` : `Strike session: ${e.label}`}
+              onClick={() => toggleStrike(e)}
+            >
+              <span className="session-time">{time(e.createdAt)}</span>
+              <span className="session-label">{e.label}</span>
+            </button>
+          );
+        }
         return (
           <button
             type="button"

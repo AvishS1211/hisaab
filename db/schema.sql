@@ -30,12 +30,13 @@ create table hisaab_members (
 create table entries (
   id          uuid primary key default gen_random_uuid(),
   hisaab_id   uuid references hisaabs(id),        -- null for settlements (person-level, pairwise)
-  kind        text not null check (kind in ('expense','settlement','strike')),
-  label       text,                                -- expense only
+  kind        text not null check (kind in ('expense','settlement','strike','session')),
+  label       text,                                -- expense: description. session: divider text.
   amount      integer,                             -- rupees, expense + settlement
   payer_id    uuid references people(id),          -- expense: who paid. settlement: who sent.
   payee_id    uuid references people(id),          -- settlement only: who received
-  split_ids   uuid[],                              -- expense only: who it's split across
+  split_ids   uuid[],                              -- expense: who it's split across.
+                                                     -- session: the new default cast from here on.
   target_id   uuid references entries(id),         -- strike only: the entry being struck
   authored_by uuid references people(id) not null,
   created_at  timestamptz not null default now()

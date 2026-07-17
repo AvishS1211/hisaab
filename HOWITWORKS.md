@@ -4,7 +4,7 @@ Current architecture snapshot. Describes the present, not the plan — see CLAUD
 
 ## Where things stand
 
-Steps 1–7 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, scoped identity via join links, Supabase persistence with realtime sync, view links with a server-rendered OG image, and the PWA (installable, offline-capable, writes queue and flush on reconnect). Remaining: sessions (step 8).
+All 8 build-order steps are now in place: engine, the three pages, both flows, corrections, groups, page-turn navigation, scoped identity via join links, Supabase persistence with realtime sync, view links with a server-rendered OG image, the PWA (installable, offline-capable, writes queue and flush on reconnect), and sessions. **One pending action:** sessions add a new `entries.kind` value ('session'), which needs `db/migrations/001-session-kind.sql` run once against the live Supabase project — see the Sessions section below.
 
 ## Layout
 
@@ -54,6 +54,10 @@ public/service-worker.js  Hand-rolled (§9): app-shell caching only, never touch
 app/manifest.ts      The PWA manifest (Next's file convention → /manifest.webmanifest).
 app/icon.tsx          512×512 app icon — the notebook object, not the deity (§8).
 app/apple-icon.tsx    Same icon, iOS "Add to Home Screen" convention (180×180).
+src/lib/sessions.ts  currentDefaultCast() — the sticky cast default a session
+                     divider sets. 7 tests.
+db/migrations/001-session-kind.sql  Widens entries.kind to add 'session' —
+                     run once against an already-deployed project.
 ```
 
 ## The paper (the hisaab page)
@@ -71,7 +75,8 @@ app/apple-icon.tsx    Same icon, iOS "Add to Home Screen" convention (180×180).
   margin-red ink. Nothing is removed.
 - Amounts are integer rupees, Indian-grouped (`toLocaleString("en-IN")`). No decimals.
 
-Only expenses render on a hisaab page — settlements are person-level (§3).
+Expenses and session dividers both render on a hisaab page, chronologically
+interleaved — settlements are person-level and never appear here (§3).
 
 ## The write flow (Likhna)
 
@@ -80,18 +85,62 @@ an always-focused `<input>` styled to write on the rule. You type `Petrol 2400`
 (`parseLine` takes the trailing whole number as the amount, the rest as the
 label — integer rupees only), tap cast chips to leave people off *this* line,
 and Enter commits. On commit the draft appends to entry state, the input clears,
-the cursor stays, and the cast resets to the full roster for the next line.
+the cursor stays, and the cast resets to the *current default* for the next
+line — the roster, unless a session divider has narrowed it (below).
+
+- **The same input writes two different kinds of line**, told apart only by
+  whether the trailing token parses as a number: a number → an expense; no
+  number (and non-empty) → a session divider. No second input, no mode toggle
+  — matches the spec's own example of a divider looking like an ordinary
+  sentence ("Dev's not here").
 
 - **Payer of a new line = the current person** (the signed-in identity). There
   is no payer picker; see the JOURNAL entry for why, and the open question of
   recording that someone *else* paid (the guest-paid-for-petrol case).
 - New lines persist via `onAddEntries` → Supabase (see Persistence below); the
   log is append-only, so a write is just an insert.
-- **Tap-to-strike:** each expense line is a `<button>`; tapping it appends a
-  `strike` targeting it, tapping a struck line appends a strike targeting the
-  live strike (undo). Struck lines stay on the page, greyed. Note: the line
-  keeps the Kalam hand because `.entry` (a class) out-specifies the UA `button`
-  font — don't add `font: inherit` to the button reset or you lose it.
+- **Tap-to-strike:** every line (expense or session) is a `<button>`; tapping it
+  appends a `strike` targeting it, tapping a struck line appends a strike
+  targeting the live strike (undo). Struck lines stay on the page, greyed.
+  Note: the line keeps the Kalam hand because `.entry` (a class) out-specifies
+  the UA `button` font — don't add `font: inherit` to the button reset or you
+  lose it.
+
+## Sessions
+
+The last build-order step, and the smallest: "Dev's not here" written on the
+open line (no trailing number) becomes a divider that narrows the default cast
+for every line after it, until another divider changes it again — the answer
+to the alcohol problem being one gesture instead of un-checking someone eight
+times.
+
+- **No session table.** A session is just another row in `entries`
+  (`kind: "session"`), reusing `label` for the divider text and `split_ids` for
+  the new default cast — exactly the fields an expense already has, repurposed.
+  `entries.kind`'s check constraint needed widening for this
+  (`db/migrations/001-session-kind.sql`); nothing else about the schema changed.
+- **`currentDefaultCast(entries, hisaabId, roster)`** (`src/lib/sessions.ts`,
+  pure, tested) scans live session entries for the hisaab in chronological
+  order and returns the most recent one's `split_ids`, or the full roster if
+  there's never been one. A struck session is ignored, same as any struck
+  entry — strike "Dev's not here" to undo it. `HisaabPage` calls this both to
+  seed the cast on mount and to reset it after every commit (expense or
+  session), so the narrowed default really is sticky across multiple lines.
+- **Rendered as a distinct divider**, not a bill line: centered, italic Kalam,
+  the time (from `created_at`) plus the label — `16:30 · Ravi not here
+  tonight` — visually quiet against the expense rows around it, but still real
+  ledger content in the same hand, because someone really did write it.
+- **Balances are untouched.** `applyExpense`/`applySettlement` in `balance.ts`
+  only match `kind === "expense"` / `"settlement"`; a session entry falls
+  through both and is silently ignored — it only ever affects *later*
+  expenses' `split_ids`, never the math directly.
+- **Verified live** by faking a successful insert response for `entries`
+  (session isn't migrated on the real DB until the migration above runs, so a
+  genuine insert would 500 and sit retrying forever in the offline queue —
+  faking success tests the real client logic without risking that): toggled a
+  person off, wrote a divider, confirmed it rendered correctly and the cast
+  strip stayed narrowed, wrote an expense with no further toggling, and
+  confirmed on Accounts that the excluded person's balance was unchanged.
 
 ## The person page (home)
 

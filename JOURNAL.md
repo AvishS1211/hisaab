@@ -218,3 +218,61 @@ Dev paid 1200            you owe Dev
 **Verified by actually breaking the network**, not by trusting the code: patched `fetch` to fail every Supabase call, wrote a line, confirmed it was visible locally but genuinely absent from the database, restored the network, watched the sync note clear, and confirmed the row landed and the local queue emptied. The same standard as every other feature this project has shipped — a green typecheck proves the code compiles, not that the offline path works.
 
 **Lesson:** when a spec confidently predicts a feature will be "trivial," that's worth treating as a claim to verify, not a reason to under-build it. Here the prediction was right, but only because an earlier, unrelated decision (append-only) had already done the hard part.
+
+---
+
+## 2026-07-17 — Step 8: Sessions, and the last resolved ambiguity in the spec
+
+**Context:** The final build-order step. CLAUDE.md describes it in one short
+paragraph — a divider that sets a default cast, "materialised onto each
+entry's split_ids at write time," and explicitly: "do not create a session
+table — the entries carry the truth." That last sentence reads two ways: pure
+ephemeral client state (never persisted), or a real row in the existing
+`entries` table (no *new*, separate table). Those are very different features.
+
+**Resolution:** the second reading. A session that lives only in one tab's
+memory can't be "a divider entry on the page" — the page, everywhere else in
+this app, means the shared log everyone reading a hisaab sees. If Avish starts
+a session on his phone and Ravi writes the next round on his, Ravi's device
+needs to know Dev's excluded, or the whole feature only works for a single
+person's single sitting. So a session is a `kind: "session"` row in `entries`,
+reusing `label` and `split_ids` — the exact fields an expense already has,
+just meaning something slightly different. "Do not create a session table"
+turns out to mean *don't build a second bookkeeping structure that needs to
+stay in sync with the first* — not "don't write it down."
+
+**Cost of that reading: a real migration.** Adding a new `kind` value means
+widening `entries.kind`'s check constraint, which needs one ALTER on the
+already-deployed project. Genuinely the first schema change since the initial
+setup — everything else this app has shipped fit inside the original table
+shapes. Wrote it as a standalone file (`db/migrations/001-session-kind.sql`)
+rather than editing `supabase-setup.sql` in place, since that file has an
+`alter publication add table` line that isn't safe to re-run.
+
+**The interaction gesture fell out of the existing input for free.** The open
+line already computes `parseLine`'s trailing-number check to decide "is this
+committable as an expense." A line with no trailing number was previously just
+a dead end (nothing happens on Enter) — the natural, zero-new-UI move was to
+give that non-number case a second meaning: session divider instead of
+no-op. Same box, same key, the only signal is whether the last word is a
+number. No mode toggle, no second button, and it happens to match the spec's
+own example verbatim ("Dev's not here" has no trailing number).
+
+**Verified without touching the un-migrated database.** Actually writing a
+session entry against the live project right now would violate the not-yet-run
+constraint, get caught by the existing error handling, and sit retrying
+forever in the offline queue — a real footgun the offline-queue design didn't
+anticipate (it can't tell "still offline" apart from "permanently rejected").
+Rather than risk leaving a stuck row in the user's real queue, patched `fetch`
+to return a fake success for `entries` inserts only, leaving every other
+call (reads, other tables) genuinely live. That exercised the whole client
+path — the divider rendering, the cast staying narrowed across a commit, the
+balance genuinely excluding the right person — without writing anything real
+until the migration is actually run.
+
+**Lesson:** "do not create a table" and "do not persist this" are not the same
+instruction, and conflating them would have shipped a feature that only half
+matches its own motivating example. When a spec's phrasing admits two
+readings, check which one the *object* (the shared page, the shopkeeper's
+book) actually supports — that's usually the tiebreaker, not which reading is
+less work.

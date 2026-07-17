@@ -3,7 +3,7 @@
 export type Deity = "ganesh" | "lakshmi";
 export type HisaabKind = "rolling" | "trip";
 export type HisaabStatus = "open" | "dissolved";
-export type EntryKind = "expense" | "settlement" | "strike";
+export type EntryKind = "expense" | "settlement" | "strike" | "session";
 
 export interface Person {
   id: string;
@@ -33,6 +33,11 @@ export interface HisaabMember {
  *  - expense:    hisaabId, label, amount, payerId, splitIds
  *  - settlement: amount, payerId (sender), payeeId (receiver); hisaabId is null
  *  - strike:     targetId (the entry being struck)
+ *  - session:    hisaabId, label (the divider text), splitIds (the new default
+ *                cast from here on). No amount, no payer. See CLAUDE.md's
+ *                Sessions section — no separate session table; this entry
+ *                *is* the record, and the running default is derived by
+ *                scanning for the most recent live one.
  *
  * Nothing here is ever mutated. Corrections are new `strike` rows; settlements
  * are new `settlement` rows. See CLAUDE.md §3.

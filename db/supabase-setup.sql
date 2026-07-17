@@ -34,7 +34,7 @@ create table if not exists hisaab_members (
 create table if not exists entries (
   id          uuid primary key default gen_random_uuid(),
   hisaab_id   uuid references hisaabs(id),
-  kind        text not null check (kind in ('expense','settlement','strike')),
+  kind        text not null check (kind in ('expense','settlement','strike','session')),
   label       text,
   amount      integer,
   payer_id    uuid references people(id),
