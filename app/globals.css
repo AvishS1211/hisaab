@@ -150,6 +150,15 @@ body {
 }
 .invite-link:hover { color: var(--ink); }
 
+/* Guest-link rows: chrome, not ledger content — quieter than an expense line. */
+.share-row {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--meta);
+}
+.share-row .label { font-family: var(--sans); }
+.share-row .invite-link { align-self: center; margin-bottom: 0; }
+
 /* A name to tap on the "Who are you?" page. */
 .who-choice .label { font-size: 21px; }
 button.who-choice:hover .label { color: var(--margin-red); }

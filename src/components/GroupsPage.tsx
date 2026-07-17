@@ -4,8 +4,7 @@ import { useRef, useState } from "react";
 import type { Entry, Hisaab, HisaabKind, HisaabMember, Person } from "../lib/types";
 import { groupBalances, netBetween } from "../lib/balance";
 import { deityLine } from "../lib/deity";
-
-const inr = (n: number) => n.toLocaleString("en-IN");
+import { inr } from "../lib/format";
 
 // The list of hisaabs, and the one place a group is born. Naming a hisaab is a
 // distinct moment (§7), so it gets a small composer — not one of the two flows.

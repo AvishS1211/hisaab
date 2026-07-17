@@ -5,8 +5,8 @@ import type { Entry, Hisaab, Person } from "../lib/types";
 import { liveEntryIds } from "../lib/balance";
 import { deityLine } from "../lib/deity";
 import { parseLine } from "../lib/parseLine";
+import { inr } from "../lib/format";
 
-const inr = (n: number) => n.toLocaleString("en-IN");
 const initial = (name: string) => name.slice(0, 1).toUpperCase();
 
 // The hisaab page with the write flow. There is no add button: the next ruled
@@ -38,6 +38,7 @@ export function HisaabPage({
   const [cast, setCast] = useState<Set<string>>(() => new Set(roster));
   const inputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedViewFor, setCopiedViewFor] = useState<string | null>(null);
 
   // The join link is the only "secret" gating this hisaab (CLAUDE.md §6) — copy
   // it to share with whoever should get write access next.
@@ -48,6 +49,19 @@ export function HisaabPage({
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {});
+  }
+
+  // A view link is read-only, forever, scoped to one person's page of this
+  // hisaab (§6) — for whoever will never install the app.
+  function copyViewLink(personId: string) {
+    const url = `${window.location.origin}/view/${hisaab.id}/${personId}`;
+    navigator.clipboard
+      ?.writeText(url)
+      .then(() => {
+        setCopiedViewFor(personId);
+        setTimeout(() => setCopiedViewFor((cur) => (cur === personId ? null : cur)), 1500);
       })
       .catch(() => {});
   }
@@ -178,6 +192,19 @@ export function HisaabPage({
           );
         })}
       </div>
+
+      <div className="spacer-1" />
+      <div className="title-row">
+        <span className="title">Guest links</span>
+      </div>
+      {roster.map((id) => (
+        <div key={id} className="entry share-row">
+          <span className="label">{nameOf(id)}</span>
+          <button type="button" className="invite-link" onClick={() => copyViewLink(id)}>
+            {copiedViewFor === id ? "copied" : "view link"}
+          </button>
+        </div>
+      ))}
 
       <div className="spacer-2" />
     </main>

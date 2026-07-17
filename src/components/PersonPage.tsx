@@ -4,22 +4,13 @@ import { useState } from "react";
 import type { Entry, Hisaab, HisaabMember, Person } from "../lib/types";
 import { buildPersonPage, type PersonSummary, type BreakdownLine } from "../lib/personView";
 import { deityLine } from "../lib/deity";
-
-const inr = (n: number) => n.toLocaleString("en-IN");
+import { inr, netPhrase } from "../lib/format";
 
 // A signed "you owe / owes you" phrase. Lead with the number, say the direction.
 function direction(youOwe: number): { verb: string; amount: number } {
   return youOwe > 0
     ? { verb: "you owe", amount: youOwe }
     : { verb: "owes you", amount: -youOwe };
-}
-
-// The masthead line: your name, then your one overall number — the page-level
-// instance of "show the number, then the working" (§1). The per-person list
-// beneath it is the working.
-function overallLine(net: number): string {
-  if (net === 0) return "you're all settled up";
-  return net > 0 ? `you owe ${inr(net)}` : `you're owed ${inr(-net)}`;
 }
 
 // The person page (profile): your name + overall net, then per-person breakdown,
@@ -167,7 +158,7 @@ export function PersonPage({
       </div>
       <div className="me-row">
         <span className="me-name">{meName}</span>
-        <span className="me-net">{overallLine(overallNet)}</span>
+        <span className="me-net">{netPhrase(overallNet)}</span>
       </div>
       <div className="spacer-1" />
 

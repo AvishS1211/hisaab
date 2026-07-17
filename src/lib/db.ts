@@ -101,6 +101,44 @@ export async function fetchAll(): Promise<Snapshot> {
   };
 }
 
+/** What a view link needs: one hisaab, its roster (for name lookups), and its
+ * entries (expenses + every strike, since a strike's own hisaab_id is null and
+ * liveEntries needs the full set to resolve which expenses are still live). */
+export interface GuestSnapshot {
+  hisaab: Hisaab | null;
+  person: Person | null;
+  people: Person[];
+  entries: Entry[];
+}
+
+export async function fetchGuestData(hisaabId: string, personId: string): Promise<GuestSnapshot> {
+  if (!supabase) return { hisaab: null, person: null, people: [], entries: [] };
+  const [hisaabRes, rosterRes, expensesRes, strikesRes] = await Promise.all([
+    supabase.from("hisaabs").select("*").eq("id", hisaabId).maybeSingle(),
+    supabase.from("hisaab_members").select("people(*)").eq("hisaab_id", hisaabId),
+    supabase.from("entries").select("*").eq("hisaab_id", hisaabId),
+    supabase.from("entries").select("*").eq("kind", "strike"),
+  ]);
+  const err = hisaabRes.error || rosterRes.error || expensesRes.error || strikesRes.error;
+  if (err) throw err;
+
+  const people = (rosterRes.data ?? [])
+    .map((r) => (r as Row).people)
+    .filter((p): p is Row => Boolean(p))
+    .map(toPerson);
+  const entries = [
+    ...(expensesRes.data ?? []).map(toEntry),
+    ...(strikesRes.data ?? []).map(toEntry),
+  ];
+
+  return {
+    hisaab: hisaabRes.data ? toHisaab(hisaabRes.data) : null,
+    person: people.find((p) => p.id === personId) ?? null,
+    people,
+    entries,
+  };
+}
+
 // ── writes (append-only) ─────────────────────────────────────────────────────
 export async function insertEntries(entries: Entry[]): Promise<void> {
   if (!supabase || entries.length === 0) return;

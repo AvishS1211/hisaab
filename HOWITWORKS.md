@@ -4,7 +4,7 @@ Current architecture snapshot. Describes the present, not the plan — see CLAUD
 
 ## Where things stand
 
-Steps 1–5 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, scoped identity via join links, and Supabase persistence with realtime sync. The book loads the log from Supabase, appends to it, and merges live inserts; it falls back to the in-memory seed when no project is configured. Remaining: view links + OG image (rest of step 6), PWA/offline (step 7), sessions (step 8).
+Steps 1–6 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, scoped identity via join links, Supabase persistence with realtime sync, and view links with a server-rendered OG image. Remaining: PWA/offline (step 7), sessions (step 8).
 
 ## Layout
 
@@ -17,11 +17,14 @@ src/lib/balance.test.ts  16 tests covering every rule the engine implements.
 src/lib/deity.ts     Deity → the Devanagari line inked at the top of the page.
 src/lib/parseLine.ts Likhna parsing: "Petrol 2400" → { label, amount }. 6 tests.
 src/lib/personView.ts  Builds the person page from the log: net + reconciling working. 6 tests.
+src/lib/guestView.ts  Builds a view link's render: one person, one hisaab. 6 tests.
+src/lib/format.ts    Shared inr()/netPhrase() — was duplicated across 3 components.
 src/lib/identity.ts  device_id + chosen person_id in localStorage. No accounts.
 src/lib/supabase.ts  The browser client (null when env vars are absent).
-src/lib/db.ts        Append-only data layer: fetchAll, insert*, realtime subscribe.
+src/lib/db.ts        Append-only data layer: fetchAll, fetchGuestData, insert*, realtime subscribe.
 src/components/WhoAreYou.tsx  The name chooser — always scoped by the caller (a
                      hisaab's roster, or nothing) — never a global directory.
+src/components/GuestPage.tsx  The view-link render — a distinct, read-only page.
 db/supabase-setup.sql  One-time SQL to run in the project (schema + RLS + realtime).
 .env.example         The two NEXT_PUBLIC vars; copy to .env.local (gitignored).
 src/lib/seed.ts      Hardcoded seed: two hisaabs (Goa, Ghar), a settlement, an old account.
@@ -31,13 +34,19 @@ src/components/PersonPage.tsx  Page 1 — Accounts: masthead (name + overall net
                      per-person breakdown, settle gesture.
 src/components/GroupsPage.tsx  Page 2 — Hisaabs: the group list + the new-hisaab composer.
 src/components/HisaabPage.tsx  Page 3 — a ledger: entries, write flow, tap-to-strike,
-                     the "invite" (copy join link) button.
+                     the "invite" (copy join link) button, per-guest view links.
 app/layout.tsx       Root layout; loads globals.css.
 app/globals.css      Tokens + the paper: font faces, ruled background, rhythm, page-turn.
 app/page.tsx         Home → the Book (bootstrap mode: no joinHisaabId).
 app/join/[hisaabId]/page.tsx  A hisaab's join link → the Book, scoped to that hisaab.
+app/view/[hisaabId]/[personId]/page.tsx  A guest's read-only page. No Book, no nav.
+app/view/[hisaabId]/[personId]/layout.tsx  generateMetadata (title/description) —
+                     server component, since the page itself is a client component.
+app/view/[hisaabId]/[personId]/opengraph-image.tsx  Renders the actual khata page as
+                     the share preview image (next/og + a plain-woff Kalam copy).
 app/hisaab/[id]/page.tsx  Redirects to home; navigation lives inside the book now.
-public/fonts/        Self-hosted Kalam woff2 (Latin + Devanagari, 300/400/700).
+public/fonts/        Self-hosted Kalam woff2 (Latin + Devanagari, 300/400/700), plus
+                     kalam-og.woff — a plain-woff copy for next/og (Satori can't read woff2).
 ```
 
 ## The paper (the hisaab page)
@@ -204,6 +213,46 @@ moves the balance toward zero (the one who owes pays the one who's owed). The
 balance recomputes immediately — no confirm, no approve (§2). A wrong one is
 handled by a strike, not an undo button. Like the write flow, settlements live
 in client state only until Supabase.
+
+## View links (guest render)
+
+The other half of §6: a join link grants write to one hisaab; a view link is
+read-only, forever, scoped to one *person's* page of one hisaab —
+`/view/<hisaabId>/<personId>`. It never touches `Book` — no identity check, no
+navigation, no write flow. Anyone holding the URL can read it; that's the
+accepted trade (forwarding it leaks only that person's page, same as
+forwarding a photo — §6).
+
+- **`buildGuestView`** (`src/lib/guestView.ts`) — pure, tested (6 cases). Takes
+  the full entry log + one hisaab + one personId and returns their one net
+  number for *that hisaab only* (gross — settlements are person-level and
+  never shown here, same as a hisaab page never claims to be settled, §3/§12)
+  plus one `GuestLine` per expense they're actually in (payer or in
+  `splitIds`) — their share, who paid, and the full amount. Matches the
+  JOURNAL's render exactly: `Movie 300 / Dev paid 1200 / you owe Dev`.
+- **`fetchGuestData(hisaabId, personId)`** (`db.ts`) — a scoped query, not
+  `fetchAll`: the hisaab row, its roster's people (via a `hisaab_members` join,
+  not the whole `people` table), and that hisaab's entries + every strike
+  (strikes carry `hisaab_id: null`, so `liveEntries` needs the full strike set
+  to resolve correctly).
+- **`page.tsx` is a client component** (fetches on mount, same pattern as
+  `Book`); **`layout.tsx` is a server component** that exports
+  `generateMetadata` — title/description can't come from a client component,
+  so the route is split. A malformed id reaches Postgres as an *error*, not an
+  empty result — both `generateMetadata` and the OG image route explicitly
+  catch that and fall back, or the whole route 500s instead of showing "link
+  not found."
+- **`opengraph-image.tsx`** renders the actual khata page as the share preview
+  (§6: "every share is a free ad") using `next/og`'s `ImageResponse`. One trap:
+  Satori (which powers it) cannot read `.woff2`, only ttf/otf/woff — the app's
+  self-hosted Kalam files are all woff2, so there's a second copy,
+  `public/fonts/kalam-og.woff` (Latin only; the OG image never renders
+  Devanagari), fetched from Google Fonts with a legacy user-agent that serves
+  plain woff instead.
+- **Sharing:** each hisaab's "Guest links" section (`HisaabPage`) lists the
+  roster with a "view link" button per person, copying
+  `/view/<hisaabId>/<personId>` to the clipboard — same pattern as "invite"
+  (the join link), one tier down.
 
 ## Import convention
 

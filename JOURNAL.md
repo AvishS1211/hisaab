@@ -188,3 +188,17 @@ Dev paid 1200            you owe Dev
 **Small footgun caught:** the automated browser kept autofilling the name field ("Lalla" instead of what was typed). Browsers treat a field labelled "name" as a contact field. Added `autocomplete="off"` to every ledger input — a khata should never offer to autofill.
 
 **Lesson:** an architecture decision made for one reason (append-only, so corrections are honest) keeps paying rent in places you didn't plan for. Offline sync, realtime, and "no migrations ever" all fell out of it for free. Worth remembering when the cheap-but-mutable option tempts early.
+
+---
+
+## 2026-07-17 — View links: the render was already specced, the plumbing wasn't
+
+**Context:** Step 6's other half. The render itself needed no new decisions — §6 and an earlier JOURNAL entry ("The guest render is better than a balance") had already worked out the exact shape: `Movie 300 / Dev paid 1200 / you owe Dev`. `buildGuestView` is almost a direct transcription of that example. The actual work was everything *around* it.
+
+**Metadata forced a file split.** `generateMetadata` (for the title and `og:description`) only works in a server component, but the view page itself is a client component (matches every other route's fetch-on-mount pattern, and keeps it simple). Next.js's answer is to put `generateMetadata` in `layout.tsx` for the route segment and leave `page.tsx` alone — a small structural wrinkle worth remembering next time a client route needs real metadata.
+
+**The OG image needed a font Satori can't read.** Every self-hosted Kalam file in this project is woff2. `next/og`'s renderer (Satori) only accepts ttf/otf/woff — it fails on woff2 with a real but unhelpfully generic pipe error. Rather than re-encode locally, fetched Kalam again from Google Fonts with an old-browser user-agent, which serves plain `.woff` instead of woff2 for compatibility — a second, Latin-only font file, `kalam-og.woff`, used nowhere else. (Devanagari isn't attempted in the OG image at all: Satori needs an explicit font per script it renders, and the deity line isn't worth a third font just for a share-preview image.)
+
+**A malformed link reaching Postgres is an error, not an empty result** — and that distinction bit both new server routes. `generateMetadata` and the OG image both called the same `fetchGuestData`, and neither had a try/catch, so a non-UUID id (the realistic shape of "someone fat-fingered the link") 500'd the whole route instead of showing "link not found." Caught by actually testing a broken link, not just a working one — the same lesson as always: exercise the failure path, don't just admire the happy path.
+
+**Lesson:** when a spec already tells you exactly what to render, the engineering risk moves entirely into the seams — how metadata plays with client components, which asset formats a rendering engine will silently choke on, what happens when someone's input doesn't match the shape you assumed. All three surfaced only by actually running the route, not by writing it correctly on the first pass and trusting it.
