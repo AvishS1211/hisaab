@@ -12,6 +12,7 @@ import {
   insertMember,
   subscribe,
 } from "../lib/db";
+import { enqueue, flushQueue, pendingCount } from "../lib/offlineQueue";
 import { deityLine } from "../lib/deity";
 import { PersonPage } from "./PersonPage";
 import { GroupsPage } from "./GroupsPage";
@@ -108,10 +109,26 @@ export function Book({
     );
   }
 
-  // ── actions: optimistic local update, then persist (append-only) ──
+  // How many writes are sitting in IndexedDB waiting to reach Supabase (§9:
+  // offline queue, flushed on reconnect — trivial because writes are inserts).
+  const [pending, setPending] = useState(0);
+  const refreshPending = () => {
+    pendingCount().then(setPending);
+  };
+  useEffect(() => {
+    refreshPending();
+  }, []);
+
+  // ── actions: optimistic local update, then persist (append-only). A failed
+  // insert (offline, most likely) is queued rather than lost — it'll land on
+  // the next flush, in the same order it was written. ──
   function addEntries(newEntries: Entry[]) {
     setEntries((prev) => mergeById(prev, newEntries));
-    insertEntries(newEntries).catch((err) => logDbError("insert entries failed", err));
+    insertEntries(newEntries).catch(async (err) => {
+      logDbError("insert entries failed", err);
+      await enqueue({ kind: "entries", entries: newEntries });
+      refreshPending();
+    });
   }
   // Returns once the insert settles, so callers that immediately reference
   // this person in another row (a hisaab_members insert, say) can await it
@@ -119,17 +136,47 @@ export function Book({
   // does and trip the foreign key.
   async function addPerson(person: Person): Promise<void> {
     setPeople((prev) => mergeById(prev, [person]));
-    await insertPerson(person).catch((err) => logDbError("insert person failed", err));
+    await insertPerson(person).catch(async (err) => {
+      logDbError("insert person failed", err);
+      await enqueue({ kind: "person", person });
+      refreshPending();
+    });
   }
   function addHisaab(hisaab: Hisaab, newMembers: HisaabMember[]) {
     setHisaabs((prev) => mergeById(prev, [hisaab]));
     setMembers((prev) => mergeMembers(prev, newMembers));
-    insertHisaab(hisaab, newMembers).catch((err) => logDbError("insert hisaab failed", err));
+    insertHisaab(hisaab, newMembers).catch(async (err) => {
+      logDbError("insert hisaab failed", err);
+      await enqueue({ kind: "hisaab", hisaab, members: newMembers });
+      refreshPending();
+    });
   }
   function addMember(member: HisaabMember) {
     setMembers((prev) => mergeMembers(prev, [member]));
-    insertMember(member).catch((err) => logDbError("insert member failed", err));
+    insertMember(member).catch(async (err) => {
+      logDbError("insert member failed", err);
+      await enqueue({ kind: "member", member });
+      refreshPending();
+    });
   }
+
+  // Flush the queue on load and whenever the browser regains connectivity.
+  // Only when Supabase is actually configured — otherwise every insert no-ops
+  // and would silently drain a queue that's waiting for a backend to exist.
+  useEffect(() => {
+    if (!configured) return;
+    function flush() {
+      flushQueue({
+        onEntries: insertEntries,
+        onPerson: insertPerson,
+        onHisaab: insertHisaab,
+        onMember: insertMember,
+      }).finally(refreshPending);
+    }
+    flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, [configured]);
 
   // ── identity ──
   const [me, setMe] = useState<string | null | undefined>(undefined);
@@ -366,6 +413,7 @@ export function Book({
 
       <div className="swipe-hint" aria-hidden="true">
         {hint}
+        {pending > 0 && <span className="pending-note"> · {pending} to sync</span>}
       </div>
     </div>
   );

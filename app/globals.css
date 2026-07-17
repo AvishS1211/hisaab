@@ -354,6 +354,8 @@ button.entry.expense.struck:hover { color: #97907e; }
   pointer-events: none;
   z-index: 5;
 }
+/* Writes waiting in the offline queue for a connection (§9). */
+.pending-note { color: var(--margin-red); opacity: 0.85; }
 
 @media (prefers-reduced-motion: reduce) {
   .turn-out, .turn-in { animation-duration: 0.01s; }

@@ -202,3 +202,19 @@ Dev paid 1200            you owe Dev
 **A malformed link reaching Postgres is an error, not an empty result** — and that distinction bit both new server routes. `generateMetadata` and the OG image both called the same `fetchGuestData`, and neither had a try/catch, so a non-UUID id (the realistic shape of "someone fat-fingered the link") 500'd the whole route instead of showing "link not found." Caught by actually testing a broken link, not just a working one — the same lesson as always: exercise the failure path, don't just admire the happy path.
 
 **Lesson:** when a spec already tells you exactly what to render, the engineering risk moves entirely into the seams — how metadata plays with client components, which asset formats a rendering engine will silently choke on, what happens when someone's input doesn't match the shape you assumed. All three surfaced only by actually running the route, not by writing it correctly on the first pass and trusting it.
+
+---
+
+## 2026-07-17 — Step 7: the offline queue was small because §10 already paid for it
+
+**Context:** PWA + offline write queue. §9 predicted this would be "trivial... because writes are inserts, never merges" — worth checking whether that held up in practice, not just in theory.
+
+**It held up.** The whole queue is: on a failed insert, save the same payload Dexie was going to send anyway; on reconnect, send it. No merge function, no version vector, no "whose write wins." The append-only bet keeps cashing out in places it wasn't originally bought for — realtime sync, and now this, off the same one decision.
+
+**The one thing that needed real thought was ordering, not conflict.** A queued strike targets a queued expense by id; if the strike's insert raced ahead of the expense's on flush, the foreign key would reject it — same shape of bug as the join-flow race two sessions ago. `flushQueue` replays strictly in insertion order and stops at the first failure rather than skipping ahead, so a later item can never jump a stalled earlier one. Cheap to get right once you're looking for it, silent and confusing if you're not.
+
+**The icon became a small but real design decision.** §8 forbids the deity as chrome or app icon — text on a page only. That rule turns out to double as a good icon brief: not "an app icon that references the theme," but the *object itself*. A red cloth-bound cover with cream ruled pages showing reads clearly at 512px and, unlike almost any illustrated mark, doesn't fight the rule that was already written down. The constraint didn't block the icon — it specified it.
+
+**Verified by actually breaking the network**, not by trusting the code: patched `fetch` to fail every Supabase call, wrote a line, confirmed it was visible locally but genuinely absent from the database, restored the network, watched the sync note clear, and confirmed the row landed and the local queue emptied. The same standard as every other feature this project has shipped — a green typecheck proves the code compiles, not that the offline path works.
+
+**Lesson:** when a spec confidently predicts a feature will be "trivial," that's worth treating as a claim to verify, not a reason to under-build it. Here the prediction was right, but only because an earlier, unrelated decision (append-only) had already done the hard part.

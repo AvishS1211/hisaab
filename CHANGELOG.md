@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **PWA + offline queue (step 7)** — the app is installable (manifest, icon — a notebook cover, not an illustrated deity per §8) and a hand-rolled service worker keeps the shell available offline. Writes made offline queue in IndexedDB (Dexie) instead of being lost, replay in order once the connection returns, and a small red "N to sync" note shows while anything's waiting. Verified live end-to-end (simulated offline, confirmed the write stayed queued and unsent, reconnected, confirmed it flushed and landed).
 - **View links + OG image** — every hisaab now has a shareable, read-only per-person link (`/view/<hisaabId>/<personId>`, via "view link" next to each name in a hisaab's new "Guest links" section). No identity, no navigation, no write flow — anyone holding the link can read that one person's page: their net for that hisaab, and for each expense they're part of, their share, who paid, and the full amount (`Movie 300 / Dev paid 1200 / you owe Dev`, matching the JOURNAL's spec exactly). The link's social preview renders the actual khata page as a server-generated image, with a matching title/description. `buildGuestView` has 6 tests.
 - Centralized `inr()`/`netPhrase()` into `src/lib/format.ts` — was duplicated verbatim across three components.
 

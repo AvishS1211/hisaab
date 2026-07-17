@@ -4,7 +4,7 @@ Current architecture snapshot. Describes the present, not the plan — see CLAUD
 
 ## Where things stand
 
-Steps 1–6 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, scoped identity via join links, Supabase persistence with realtime sync, and view links with a server-rendered OG image. Remaining: PWA/offline (step 7), sessions (step 8).
+Steps 1–7 are essentially done: engine, the three pages, both flows, corrections, groups, page-turn navigation, scoped identity via join links, Supabase persistence with realtime sync, view links with a server-rendered OG image, and the PWA (installable, offline-capable, writes queue and flush on reconnect). Remaining: sessions (step 8).
 
 ## Layout
 
@@ -47,6 +47,13 @@ app/view/[hisaabId]/[personId]/opengraph-image.tsx  Renders the actual khata pag
 app/hisaab/[id]/page.tsx  Redirects to home; navigation lives inside the book now.
 public/fonts/        Self-hosted Kalam woff2 (Latin + Devanagari, 300/400/700), plus
                      kalam-og.woff — a plain-woff copy for next/og (Satori can't read woff2).
+src/lib/offlineQueue.ts  IndexedDB (Dexie) write queue: enqueue on a failed
+                     insert, flush in order on reconnect. 
+src/components/ServiceWorkerRegister.tsx  Registers public/service-worker.js on mount.
+public/service-worker.js  Hand-rolled (§9): app-shell caching only, never touches a write.
+app/manifest.ts      The PWA manifest (Next's file convention → /manifest.webmanifest).
+app/icon.tsx          512×512 app icon — the notebook object, not the deity (§8).
+app/apple-icon.tsx    Same icon, iOS "Add to Home Screen" convention (180×180).
 ```
 
 ## The paper (the hisaab page)
@@ -253,6 +260,44 @@ forwarding a photo — §6).
   roster with a "view link" button per person, copying
   `/view/<hisaabId>/<personId>` to the clipboard — same pattern as "invite"
   (the join link), one tier down.
+
+## PWA + offline (§9)
+
+Two independent pieces: install (manifest + icon + service worker) and write
+resilience (the offline queue). Neither depends on the other.
+
+- **Manifest + icon.** `app/manifest.ts` is Next's file convention (served at
+  `/manifest.webmanifest`, auto-linked in `<head>`). The icon
+  (`app/icon.tsx`/`app/apple-icon.tsx`, `next/og` `ImageResponse`, same
+  technique as the OG image) is deliberately *not* an illustrated deity — §8 is
+  explicit that the deity is text on a page, never chrome, never the app icon.
+  It renders the object instead: a cloth-bound red cover with cream ruled pages
+  showing, legible at icon size.
+- **Service worker** (`public/service-worker.js`) is hand-rolled per §9 ("fine
+  and smaller"). It only ever intercepts `GET`s, and only same-origin ones —
+  Supabase calls pass straight through untouched. Navigations are
+  network-first with a cache fallback (so the shell still loads offline);
+  other same-origin assets (fonts, icons) are cache-first with a background
+  refresh. Registered client-side by `ServiceWorkerRegister`, mounted once in
+  the root layout.
+- **The offline write queue** (`src/lib/offlineQueue.ts`) is genuinely small
+  *because* the log is append-only (§10): a queued write is just an insert
+  that hasn't landed yet, and replaying it twice is exactly as safe as an
+  offline duplicate already is (strike one, don't dedup) — no merge, no
+  conflict resolution, ever. Dexie stores queued actions in insertion order;
+  `Book`'s four `add*` actions already do an optimistic local update before
+  attempting the Supabase insert — if that insert throws, the same payload is
+  enqueued instead of lost. `flushQueue` replays in order and stops at the
+  first failure, so (say) a queued strike can never jump ahead of the queued
+  expense it targets. Flushed on mount and on the browser's `online` event; a
+  small red note in the swipe-hint ("· N to sync") shows the count while
+  anything's waiting.
+- **Verified live**, not simulated in the abstract: patched `window.fetch` to
+  reject Supabase calls, wrote a line (it appeared optimistically and the
+  "1 to sync" note showed), confirmed via a direct read that it had *not*
+  reached Supabase, restored `fetch` and fired `online`, watched the note
+  clear, and confirmed both that the row now exists in Supabase and that the
+  IndexedDB queue is empty.
 
 ## Import convention
 
